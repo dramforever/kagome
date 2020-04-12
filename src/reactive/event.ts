@@ -4,13 +4,13 @@ export class ListeningSentinel<T>
     implements Sentinel<T | undefined>, Disposable {
     value: T | undefined;
     eventEmitter: EventEmitter<T>;
-    onHasValueChanged: KEvent<T>;
+    onTrigger: KEvent<T>;
     eventDisposable: Disposable;
 
     constructor(event: KEvent<T>) {
         this.value = undefined;
         this.eventEmitter = new EventEmitter();
-        this.onHasValueChanged = this.eventEmitter.event;
+        this.onTrigger = this.eventEmitter.event;
 
         this.eventDisposable = event((x) => {
             this.value = x;

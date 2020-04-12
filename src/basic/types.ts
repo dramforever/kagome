@@ -7,7 +7,7 @@ export interface Disposable {
 // TODO: Decorator for sentinel-creating functions, check if sentinel is run
 export interface Sentinel<T> {
     value: T;
-    onHasValueChanged: KEvent<T>;
+    onTrigger: KEvent<T>;
 }
 
 export type Runnable<T> =
@@ -19,6 +19,6 @@ export type Runnable<T> =
 export function pureS<T>(value: T): Sentinel<T> {
     return {
         value,
-        onHasValueChanged: () => ({ dispose: () => {} })
+        onTrigger: () => ({ dispose: () => {} })
     };
 }
