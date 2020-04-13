@@ -1,10 +1,9 @@
 import { KEvent } from './event';
+import { ensureRun } from './debug';
 
 export interface Disposable {
     dispose: () => void;
 }
-
-// TODO: Decorator for sentinel-creating functions, check if sentinel is run
 export interface Sentinel<T> {
     value: T;
     onTrigger: KEvent<T>;
@@ -17,8 +16,8 @@ export type Runnable<T> =
         : never)
 
 export function pureS<T>(value: T): Sentinel<T> {
-    return {
+    return ensureRun({
         value,
         onTrigger: () => ({ dispose: () => {} })
-    };
+    });
 }

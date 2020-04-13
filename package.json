@@ -21,6 +21,7 @@
         "watch": "webpack --watch --config webpack.config.js"
     },
     "dependencies": {
+        "stacktrace-gps": "^3.0.4",
         "stacktrace-js": "^2.0.2"
     }
 }

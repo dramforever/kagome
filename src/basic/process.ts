@@ -1,5 +1,6 @@
 import { Sentinel, Disposable, Runnable } from "./types";
 import { KEvent, EventEmitter } from './event';
+import { registerHasRun, ensureRun } from "./debug";
 
 export type ProcessFunction<T> =
     (run: <A>(sen: () => Runnable<A>) => A) => T
@@ -33,6 +34,7 @@ export class Process<T> implements Sentinel<T>, Disposable {
 
             if (index >= this.cache.length) {
                 const val = sen();
+                registerHasRun(val);
                 this.cache.push(val as Runnable<unknown>);
                 if (val.onTrigger) {
                     this.handlerDisposables.push(
@@ -63,5 +65,10 @@ export class Process<T> implements Sentinel<T>, Disposable {
 }
 
 export function process<T>(pf: ProcessFunction<T>): Process<T> {
-    return new Process(pf);
+    return ensureRun(new Process(pf));
+}
+
+export function toplevel<T>(p: ProcessFunction<T> | Process<T>) {
+    const proc = p instanceof Process ? p : process(p);
+    registerHasRun(proc);
 }
