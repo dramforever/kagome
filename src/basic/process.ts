@@ -5,9 +5,13 @@ import { registerHasRun, ensureRun } from "./debug";
 export type ProcessFunction<T> =
     (run: <A>(sen: () => Runnable<A>) => A) => T
 
+interface StateElement {
+    cache: Runnable<unknown>;
+    handleD: Disposable | null;
+}
+
 export class Process<T> implements Sentinel<T>, Disposable {
-    cache: Runnable<unknown>[] = [];
-    handlerDisposables: Disposable[] = [];
+    state: StateElement[] = [];
 
     value: T;
 
@@ -32,35 +36,40 @@ export class Process<T> implements Sentinel<T>, Disposable {
         return <A>(sen: () => Runnable<A>): A => {
             const index = curIndex ++;
 
-            if (index >= this.cache.length) {
+            if (index >= this.state.length) {
                 const val = sen();
                 registerHasRun(val);
-                this.cache.push(val as Runnable<unknown>);
-                if (val.onTrigger) {
-                    this.handlerDisposables.push(
-                        val.onTrigger(() => {
-                            this.handlerDisposables.splice(index)
-                                .forEach(x => x.dispose());
-                            this.cache.splice(index)
-                                .forEach(x => x.dispose?.());
-                            this.value = this.run();
-                            this.changeEmitter.fire(this.value);
-                        }));
-                }
-            }
-            // TODO: Add call stack check for cached
 
-            return this.cache[index].value as A;
+                const handleD =
+                    val.onTrigger?.(() => {
+                        for (const se of this.state.splice(index)) {
+                            se.handleD?.dispose();
+                            se.cache.dispose?.();
+                        }
+                        this.value = this.run();
+                        this.changeEmitter.fire(this.value);
+                    });
+
+                this.state.push({
+                    cache: val as Runnable<unknown>,
+                    handleD: handleD ?? null
+                });
+            }
+
+            // TODO: Add call stack check for cached
+            return this.state[index].cache.value as A;
         }
     }
 
     dispose() {
-        this.handlerDisposables.forEach(x => x.dispose());
-        this.cache.forEach(x => x.dispose?.());
+        for (const se of this.state) {
+            se.handleD?.dispose();
+            se.cache.dispose?.();
+        }
+
         this.changeEmitter.dispose();
 
-        this.cache.length = 0;
-        this.handlerDisposables.length = 0;
+        this.state.length = 0;
     }
 }
 
