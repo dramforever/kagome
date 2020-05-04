@@ -3,28 +3,43 @@
 import * as K from './index';
 
 export function __kagomeDemo(main: Node) {
+    function Input(props: {
+        id: string,
+        valueEmitter: K.EventEmitter<string>
+    }): K.Process<HTMLInputElement> {
+        return K.process((run) => {
+            const inp = run(() => <input id={props.id} />) as HTMLInputElement;
+            run(() => K.domEvent(inp, 'input')(
+                () => props.valueEmitter.fire(inp.value)
+            ));
+            return inp;
+        });
+    }
+
     const interact = () => K.process((run) => {
         const container = run(() => <div />);
 
         for (let i = 0;; i ++) {
             const id = run(() => K.pureS('inp-' + Math.random().toString().slice(2)));
 
+            const valueEmitter = new K.EventEmitter<string>();
+            const inp = run(() => Input({id, valueEmitter}));
             const para = run(() =>
-                <p><label for={id}>Please type {i}: </label></p>
+                <p>
+                    <label for={id}>Please type {i}: </label>
+                    {inp}
+                </p>
             );
 
-            const inp = run(() => <input id={id}/>) as HTMLInputElement;
-
-            run(() => K.appendChildD(para, inp));
             run(() => K.appendChildD(container, para));
 
-            run(() => K.listenS(K.domEvent(inp, 'input')));
+            const value = run(() => K.listenS(valueEmitter.event));
 
-            if (inp.value !== i.toString()) {
+            if (value !== i.toString()) {
                 run(() => K.setAttributeD(inp, 'class', 'wrong'))
-                if (inp.value !== '') {
+                if (value !== undefined && value !== '') {
                     const prompt = run(() =>
-                        <p class="prompt">{inp.value} isn't right</p>
+                        <p class="prompt">{value} isn't right</p>
                     );
                     run(() => K.appendChildD(container, prompt));
                 }
