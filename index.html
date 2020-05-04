@@ -1,0 +1,37 @@
+<script src="dist/index.js"></script>
+
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style style="display: block;" contenteditable="true">
+    .prompt {
+        text-decoration: underline;
+    }
+
+    .ok {
+        border: 1px solid green;
+    }
+
+    .wrong {
+        border: 1px solid red;
+    }
+
+    input:focus {
+        outline: none;
+    }
+
+    body {
+        margin-bottom: 50px;
+    }
+</style>
+
+</head>
+
+<body>
+
+<div id="container"></div>
+
+<script id="demo">
+    Kagome.__kagomeDemo(document.querySelector('#container'));
+</script>

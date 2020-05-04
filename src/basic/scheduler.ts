@@ -12,14 +12,17 @@ export class Scheduler {
         this.begin();
     }
 
-    begin() {
+    private begin() {
         if (this.running) return;
 
-        this.running = true;
-        while (this.pending.length) {
-            this.pending.shift()!();
+        try {
+            this.running = true;
+            while (this.pending.length) {
+                this.pending.shift()!();
+            }
+        } finally {
+            this.running = false;
         }
-        this.running = false;
     }
 }
 

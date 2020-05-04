@@ -1,5 +1,4 @@
-import { ensureRun } from "./debug";
-import { Disposable } from "./types";
+import { ensureRun, Disposable } from "../basic";
 
 export function setPropertyD<A, K extends keyof A>(
     target: A, key: K, value: A[K]

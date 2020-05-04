@@ -16,14 +16,14 @@ export class Process<T> implements Sentinel<T>, Disposable {
 
     value: T;
 
-    changeEmitter: EventEmitter<T>;
+    triggerEmitter: EventEmitter<T>;
     onTrigger: KEvent<T>;
 
     constructor(
         public pf: ProcessFunction<T>
     ) {
-        this.changeEmitter = new EventEmitter();
-        this.onTrigger = this.changeEmitter.event;
+        this.triggerEmitter = new EventEmitter();
+        this.onTrigger = this.triggerEmitter.event;
         this.value = this.run();
     }
 
@@ -50,7 +50,7 @@ export class Process<T> implements Sentinel<T>, Disposable {
                                 se.cache.dispose?.();
                             }
                             this.value = this.run();
-                            this.changeEmitter.fire(this.value);
+                            this.triggerEmitter.fire(this.value);
                         })
                     );
 
@@ -71,7 +71,7 @@ export class Process<T> implements Sentinel<T>, Disposable {
             se.cache.dispose?.();
         }
 
-        this.changeEmitter.dispose();
+        this.triggerEmitter.dispose();
 
         this.state.length = 0;
     }

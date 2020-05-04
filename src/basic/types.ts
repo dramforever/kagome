@@ -9,6 +9,10 @@ export interface Sentinel<T> {
     onTrigger: KEvent<T>;
 }
 
+export function isSentinel(val: any): val is Sentinel<unknown> {
+    return typeof val === 'object' && 'onTrigger' in val && 'value' in val;
+}
+
 export type Runnable<T> =
     Sentinel<T> & Partial<Disposable>
     | (void extends T
