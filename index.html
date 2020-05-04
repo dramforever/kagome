@@ -9,20 +9,23 @@
         text-decoration: underline;
     }
 
-    .ok {
-        border: 1px solid green;
-    }
-
-    .wrong {
-        border: 1px solid red;
-    }
-
-    input:focus {
-        outline: none;
-    }
+    .ok { border: 1px solid green; }
+    .wrong { border: 1px solid red; }
+    input:focus { outline: none; }
 
     body {
         margin-bottom: 50px;
+        max-height: 750px;
+    }
+
+    .main {
+        display: flex;
+    }
+
+    .main div {
+        border: 1px solid black;
+        padding: 15px;
+        margin: 15px;
     }
 </style>
 

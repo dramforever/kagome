@@ -1,21 +1,22 @@
 /* @jsx K.kagomeElement */
 
 import * as K from './index';
+import { mapped } from './data';
 
-export function __kagomeDemo(container: Node) {
-    return K.toplevel((run) => {
+export function __kagomeDemo(main: Node) {
+    const interact = () => K.process((run) => {
+        const container = run(() => K.pureS(document.createElement('div')));
+
         for (let i = 0;; i ++) {
-            const id = 'inp-' + Math.random().toString().slice(2);
+            const id = run(() => K.pureS('inp-' + Math.random().toString().slice(2)));
+
+            const para = run(() =>
+                <p><label for={id}>Please type {i}: </label></p>
+            );
 
             const inp = run(() => <input id={id}/>) as HTMLInputElement;
 
-            const para = run(() =>
-                <p>
-                    <label for={id}>Please type {i}: </label>
-                    {inp}
-                </p>
-            );
-
+            run(() => K.appendChildD(para, inp));
             run(() => K.appendChildD(container, para));
 
             run(() => K.listenS(K.domEvent(inp, 'input')));
@@ -28,10 +29,23 @@ export function __kagomeDemo(container: Node) {
                     );
                     run(() => K.appendChildD(container, prompt));
                 }
-                return;
+                break;
             } else {
                 run(() => K.setAttributeD(inp, 'class', 'ok'))
             }
         }
+
+        return container;
     });
+
+    return K.toplevel((run) => {
+        const app = run(() =>
+            <div class="main">
+                {interact()}
+                {mapped([interact(), interact()])}
+            </div>
+        );
+
+        run(() => K.appendChildD(document.body, app));
+    })
 }

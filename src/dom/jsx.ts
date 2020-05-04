@@ -17,7 +17,7 @@ export namespace JSX {
 }
 
 type KagomeNullChild = boolean | undefined | null;
-type KagomeChild = Node | Node[] | string | KagomeNullChild;
+type KagomeChild = Node | Node[] | string | number | KagomeNullChild;
 type KagomeChildSentinel = AddSentinel<KagomeChild>
 
 type KagomePropsSimple<El> =
@@ -25,6 +25,32 @@ type KagomePropsSimple<El> =
     | { [k in Exclude<string, keyof El>]: string };
 
 type KagomeProps<El> = WithSentinel<KagomePropsSimple<El>>;
+
+function genChild(range: Range, ch: KagomeChild): void {
+    console.log(range, ch);
+
+    range.deleteContents();
+
+    if (typeof ch === 'boolean'
+        || ch === undefined
+        || ch === null) {
+        const comment = document.createComment(String(ch));
+        range.insertNode(comment);
+    } else if (Array.isArray(ch)) {
+        const frag = document.createDocumentFragment();
+        ch.forEach(x => frag.append(x));
+        range.insertNode(frag);
+    } else if (typeof ch === 'string' || typeof ch === 'number') {
+        const text = document.createTextNode(String(ch));
+        range.insertNode(text);
+    } else {
+        range.insertNode(ch);
+    }
+}
+
+function arrayEquals<T>(a: T[], b: T[]): boolean {
+    return a.length == b.length && a.every((val, i) => val == b[i]);
+}
 
 export function kagomeElement<K extends keyof HTMLElementTagNameMap>(
     tag: K, props: KagomeProps<HTMLElementTagNameMap[K]>, ...children: KagomeChildSentinel[]
@@ -35,7 +61,14 @@ export function kagomeElement<K extends keyof HTMLElementDeprecatedTagNameMap>(
 export function kagomeElement(
     tag: string, props: KagomeProps<HTMLElement>, ...children: KagomeChildSentinel[]
 ): Process<HTMLElement> {
-    return ensureRun(process((run) => {
+    const proc = process((run) => {
+        type CacheElement = {
+            ch: KagomeChild,
+            range: Range
+        };
+
+        const cache: CacheElement[] = run(() => pureS([]));
+
         const element = run(() => pureS(document.createElement(tag)));
         const res = run(() => mapped({
             props: mapped<KagomePropsSimple<typeof element>>(props),
@@ -52,23 +85,34 @@ export function kagomeElement(
             }
         }
 
-        const frag = new DocumentFragment();
-
-        for (const ch of res.children) {
-            if (typeof ch === 'boolean' || ch === undefined || ch === null)
-                continue;
-
-            if (Array.isArray(ch)) {
-                frag.append(... ch);
+        if (children.length > 0) {
+            if (cache.length === 0) {
+                for (const ch of res.children) {
+                    const range = document.createRange();
+                    range.selectNodeContents(element);
+                    range.setStart(range.endContainer, range.endOffset);
+                    console.log('new');
+                    genChild(range, ch);
+                    cache.push({ ch, range });
+                }
             } else {
-                frag.append(ch);
+                res.children.forEach((ch, i) => {
+                    if (ch === cache[i].ch
+                        || Array.isArray(ch)
+                            && Array.isArray(cache[i].ch)
+                            && arrayEquals(ch, cache[i].ch as Node[])) {
+                        return;
+                    }
+                    cache[i].ch = ch;
+                    genChild(cache[i].range, ch);
+                })
             }
         }
 
-        // TODO Is this the best way?
-        element.innerHTML = '';
-        element.appendChild(frag);
-
         return element;
-    }));
+    });
+
+    // Element will never change
+    proc.onTrigger = () => { return { dispose: () => {} }};
+    return ensureRun(proc);
 }
