@@ -45,7 +45,7 @@ export class Process<T> implements Sentinel<T>, Disposable {
                 const handleD =
                     val.onTrigger?.(() =>
                         globalScheduler.add(() => {
-                            for (const se of this.state.splice(index)) {
+                            for (const se of this.state.splice(index + 1)) {
                                 se.handleD?.dispose();
                                 se.cache.dispose?.();
                             }
