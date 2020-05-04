@@ -46,6 +46,6 @@ export function __kagomeDemo(main: Node) {
             </div>
         );
 
-        run(() => K.appendChildD(document.body, app));
+        run(() => K.appendChildD(main, app));
     })
 }

@@ -27,8 +27,6 @@ type KagomePropsSimple<El> =
 type KagomeProps<El> = WithSentinel<KagomePropsSimple<El>>;
 
 function genChild(range: Range, ch: KagomeChild): void {
-    console.log(range, ch);
-
     range.deleteContents();
 
     if (typeof ch === 'boolean'
@@ -91,7 +89,6 @@ export function kagomeElement(
                     const range = document.createRange();
                     range.selectNodeContents(element);
                     range.setStart(range.endContainer, range.endOffset);
-                    console.log('new');
                     genChild(range, ch);
                     cache.push({ ch, range });
                 }
