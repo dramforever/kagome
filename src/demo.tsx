@@ -1,11 +1,10 @@
 /* @jsx K.kagomeElement */
 
 import * as K from './index';
-import { mapped } from './data';
 
 export function __kagomeDemo(main: Node) {
     const interact = () => K.process((run) => {
-        const container = run(() => K.pureS(document.createElement('div')));
+        const container = run(() => <div />);
 
         for (let i = 0;; i ++) {
             const id = run(() => K.pureS('inp-' + Math.random().toString().slice(2)));
@@ -42,7 +41,7 @@ export function __kagomeDemo(main: Node) {
         const app = run(() =>
             <div class="main">
                 {interact()}
-                {mapped([interact(), interact()])}
+                {K.mapped([interact(), interact()])}
             </div>
         );
 
