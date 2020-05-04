@@ -61,5 +61,5 @@ export function __kagomeDemo(main: Node) {
         );
 
         run(() => K.appendChildD(main, app));
-    })
+    });
 }
