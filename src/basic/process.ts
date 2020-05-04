@@ -1,6 +1,7 @@
 import { Sentinel, Disposable, Runnable } from "./types";
 import { KEvent, EventEmitter } from './event';
 import { registerHasRun, ensureRun } from "./debug";
+import { globalScheduler } from "./scheduler";
 
 export type ProcessFunction<T> =
     (run: <A>(sen: () => Runnable<A>) => A) => T
@@ -27,7 +28,8 @@ export class Process<T> implements Sentinel<T>, Disposable {
     }
 
     run(): T {
-        return this.pf(this.makeWorker());
+        const res = this.pf(this.makeWorker());
+        return res;
     }
 
     makeWorker(): <A>(sen: () => Runnable<A>) => A {
@@ -41,14 +43,16 @@ export class Process<T> implements Sentinel<T>, Disposable {
                 registerHasRun(val);
 
                 const handleD =
-                    val.onTrigger?.(() => {
-                        for (const se of this.state.splice(index)) {
-                            se.handleD?.dispose();
-                            se.cache.dispose?.();
-                        }
-                        this.value = this.run();
-                        this.changeEmitter.fire(this.value);
-                    });
+                    val.onTrigger?.(() =>
+                        globalScheduler.add(() => {
+                            for (const se of this.state.splice(index)) {
+                                se.handleD?.dispose();
+                                se.cache.dispose?.();
+                            }
+                            this.value = this.run();
+                            this.changeEmitter.fire(this.value);
+                        })
+                    );
 
                 this.state.push({
                     cache: val as Runnable<unknown>,
