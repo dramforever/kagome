@@ -10,7 +10,12 @@ export interface Sentinel<T> {
 }
 
 export function isSentinel(val: any): val is Sentinel<unknown> {
-    return typeof val === 'object' && 'onTrigger' in val && 'value' in val;
+    return (
+        typeof val === 'object'
+        && val !== null
+        && 'onTrigger' in val
+        && 'value' in val
+    );
 }
 
 export type Runnable<T> =

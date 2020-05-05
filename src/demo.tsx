@@ -3,60 +3,66 @@
 import * as K from './index';
 
 export function __kagomeDemo(main: Node) {
-    function Input(props: {
-        id: string,
-        valueEmitter: K.EventEmitter<string>
-    }): K.Process<HTMLInputElement> {
-        return K.process((run) => {
-            const inp = run(() => <input id={props.id} />) as HTMLInputElement;
-            run(() => K.domEvent(inp, 'input')(
-                () => props.valueEmitter.fire(inp.value)
-            ));
-            return inp;
-        });
-    }
+    const Input:
+        (props: { valueR: K.Register<string> }
+            & K.JSX.ElementProps<HTMLInputElement>)
+            => K.Process<HTMLInputElement> =
+        ({ valueR, ...rest }) => K.process((run) => {
 
-    const interact = () => K.process((run) => {
+        const inp = run(() => <input {... rest} />) as HTMLInputElement;
+        run(() => K.domEvent(inp, 'input')(
+            () => valueR.setDirectly(inp.value)
+        ));
+        return inp;
+    });
+
+    const Interact:
+        (props?: {}) => K.Process<HTMLDivElement> =
+        () => K.process((run) => {
+
         const container = run(() => <div />);
 
         for (let i = 0;; i ++) {
             const id = run(() => K.pureS('inp-' + Math.random().toString().slice(2)));
 
-            const valueEmitter = new K.EventEmitter<string>();
-            const inp = run(() => Input({id, valueEmitter}));
+            const classR = run(() => K.reg<string | undefined>(undefined));
+            const valueR = run(() => K.reg(''));
+            const hiddenR = run(() => K.reg(false));
+
             const para = run(() =>
                 <p>
                     <label for={id}>Please type {i}: </label>
-                    {inp}
+                    <Input id={id} class={classR} valueR={valueR}/>
+                    <p class="prompt" hidden={hiddenR}>{valueR} isn't right</p>
                 </p>
             );
 
             run(() => K.appendChildD(container, para));
 
-            const value = run(() => K.listenS(valueEmitter.event));
+            const value = run(() => valueR);
 
             if (value !== i.toString()) {
-                run(() => K.setAttributeD(inp, 'class', 'wrong'))
-                if (value !== undefined && value !== '') {
-                    const prompt = run(() =>
-                        <p class="prompt">{value} isn't right</p>
-                    );
-                    run(() => K.appendChildD(container, prompt));
+                run(() => classR.setS('wrong'));
+
+                if (value === undefined || value === '') {
+                    // Input is empty
+                    run(() => hiddenR.setS(true));
                 }
                 break;
             } else {
-                run(() => K.setAttributeD(inp, 'class', 'ok'))
+                run(() => hiddenR.setS(true));
+                run(() => classR.setS('ok'));
             }
         }
 
-        return container;
+        return container as HTMLDivElement;
     });
 
     return K.toplevel((run) => {
         const app = run(() =>
             <div class="main">
-                {interact()}
-                {K.mapped([interact(), interact()])}
+                {<Interact />}
+                {K.mapped([Interact(), <Interact />])}
             </div>
         );
 
