@@ -23,35 +23,37 @@ export function __kagomeDemo(main: Node) {
         const container = run(() => <div />);
 
         for (let i = 0;; i ++) {
-            const id = run(() => K.pureS('inp-' + Math.random().toString().slice(2)));
+            const id = run(() =>
+                K.pureS(`inp-${Math.random() * Math.pow(2, 52)}`)
+            );
 
             const classR = run(() => K.reg<string | undefined>(undefined));
             const valueR = run(() => K.reg(''));
             const hiddenR = run(() => K.reg(false));
 
-            const para = run(() =>
-                <p>
+            const part = run(() =>
+                <div>
                     <label for={id}>Please type {i}: </label>
                     <Input id={id} class={classR} valueR={valueR}/>
                     <p class="prompt" hidden={hiddenR}>{valueR} isn't right</p>
-                </p>
+                </div>
             );
 
-            run(() => K.appendChildD(container, para));
+            run(() => K.appendChildD(container, part));
 
             const value = run(() => valueR);
 
             if (value !== i.toString()) {
-                run(() => classR.setS('wrong'));
+                run(() => classR.setD('wrong'));
 
                 if (value === undefined || value === '') {
                     // Input is empty
-                    run(() => hiddenR.setS(true));
+                    run(() => hiddenR.setD(true));
                 }
                 break;
             } else {
-                run(() => hiddenR.setS(true));
-                run(() => classR.setS('ok'));
+                run(() => hiddenR.setD(true));
+                run(() => classR.setD('ok'));
             }
         }
 

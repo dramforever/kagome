@@ -18,7 +18,7 @@ export class Register<T> implements Sentinel<T>, Disposable {
         this.triggerEmitter.fire(value);
     }
 
-    setS(value: T): Disposable {
+    setD(value: T): Disposable {
         const oldValue = this.value;
         this.setDirectly(value);
         return {
