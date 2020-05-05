@@ -1,6 +1,11 @@
 # Kagome
 
-*A framework for imperative reactive programming. **Very much work in
+<div align="center">
+    <p><img src="images/icon.svg" alt="Kagome icon">
+    <p><em>A framework for imperative reactive programming.</em>
+</div>
+
+***Very much work in
 progress.***
 
 ## Current progress
@@ -11,83 +16,151 @@ elements.
 
 ## A glimpse of Kagome
 
-(The following are code fragments. For a complete example see `src/demo.ts`.)
+(The following are code fragments from `src/demo.ts`. They are meant to show
+what code using Kagome looks like, so they might not make sense. Check the full
+demo file for details)
 
 Import Kagome, using `K` as the shorthand prefix:
 
-```jsx
+```tsx
 import * as K from 'kagome';
 ```
 
-Create a process using `K.process`:
+Creating a process using `K.process`:
 
-```jsx
-const interact = () => K.process((run) => {
+```tsx
+const Interact:
+    (props?: {}) => K.Process<HTMLDivElement> =
+    () => K.process((run) => {
 ```
 
 Processes must be pure, when disregarding calls to `run`. Wrap impure things to
 avoid recomputation: (In general, impurity must be used with caution.)
 
-```jsx
-    const id = run(() => K.pureS('inp-' + Math.random().toString().slice(2)));
-```
-
-Creating your own components:
-
-```jsx
-    function Input(props: {
-        id: string,
-        valueEmitter: K.EventEmitter<string>
-    }): K.Process<HTMLInputElement> {
-        return K.process((run) => {
-            const inp = run(() => <input id={props.id} />) as HTMLInputElement;
-            run(() => K.domEvent(inp, 'input')(
-                () => props.valueEmitter.fire(inp.value)
-            ));
-            return inp;
-        });
-    }
-```
-
-Composing and creating elements and components using JSX syntax:
-
-```jsx
-    const valueEmitter = new K.EventEmitter<string>();
-    const inp = run(() => Input({id, valueEmitter}));
-    const para = run(() =>
-        <p>
-            <label for={id}>Please type {i}: </label>
-            {inp}
-        </p>
+```tsx
+    const id = run(() =>
+        K.pureS(`inp-${Math.random() * Math.pow(2, 52)}`)
     );
+```
+
+Creating reactive values called *registers*:
+
+```tsx
+    const classR = run(() => K.reg<string | undefined>(undefined));
+    const valueR = run(() => K.reg(''));
+    const hiddenR = run(() => K.reg(false));
+```
+
+Creating and composing elements and components using JSX syntax. Note how
+attributes are allowed to be reactive values, and how sharing `valueR` between
+`Input` and `p` hooks the two up, declaratively specifying reactivity:
+
+```tsx
+    const part = run(() =>
+        <div>
+            <label for={id}>Please type {i}: </label>
+            <Input id={id} class={classR} valueR={valueR}/>
+            <p class="prompt" hidden={hiddenR}>{valueR} isn't right</p>
+        </div>
+    );
+```
+
+`Input` is a wrapper component over HTML `input`. Note how `rest` passes through
+HTML attributes:
+
+```tsx
+const Input:
+    (props: { valueR: K.Register<string> }
+        & K.JSX.ElementProps<HTMLInputElement>)
+        => K.Process<HTMLInputElement> =
+    ({ valueR, ...rest }) => K.process((run) => {
+
+    const inp = run(() => <input {... rest} />) as HTMLInputElement;
+    run(() => K.domEvent(inp, 'input')(
+        () => valueR.setDirectly(inp.value)
+    ));
+    return inp;
+});
 ```
 
 Running actions:
 
-```jsx
-    run(() => K.appendChildD(container, para));
+```tsx
+    run(() => K.appendChildD(container, part));
 ```
 
 So far, nothing out of the ordinary. This is about to change.
 
-Listening to events:
+You can read a reactive register by running it:
 
-```jsx
-    const value = run(() => K.listenS(valueEmitter.event));
+```tsx
+    const value = run(() => valueR);
 ```
 
-You saw it right: **listening events work like function calls**. What's going
-on?
+You saw it right: **You can work with reactive values without dealing with event
+handlers**. You can literally just ask for its value.
 
-As promised, Kagome is a framework for imperative reactive programming. The
-basic premise is as follows:
+Effectively, you can write your code only thinking in the
+forward direction, generating output from input, and Kagome will take care of
+switching between branches of history. For example:
+
+```tsx
+    if (value !== i.toString()) {
+        run(() => classR.setD('wrong'));
+
+        if (value === undefined || value === '') {
+            // Input is empty
+            run(() => hiddenR.setD(true));
+        }
+        break;
+    } else {
+        run(() => hiddenR.setD(true));
+        run(() => classR.setD('ok'));
+    }
+```
+
+Note that when the input value (`valueR`) changes and `value !== i.toString()`
+is still true, if the new value is not empty, `hiddenR` will automatically
+revert to the previous value. There is no need to handle this case explicitly.
+
+Since a process does exactly what was needed to move from one history to the
+next, there is no need for a virtual DOM. `container` is a native
+`HTMLDivElement` and can be used elsewhere:
+
+(The assertion is needed due to a limitation in TypeScript's JSX support.)
+
+```tsx
+    return container as HTMLDivElement;
+});
+```
+
+The following shows some composition capabilities, using both JSX and plain JS syntax
+together, and a combinator `K.mapped` for running actions in parallel:
+
+```tsx
+K.toplevel((run) => {
+    const app = run(() =>
+        <div class="main">
+            {<Interact />}
+            {K.mapped([Interact(), <Interact />])}
+        </div>
+    );
+
+    run(() => K.appendChildD(main, app));
+});
+```
+
+## What's going on under the hoods?
+
+As promised, Kagome is a framework for imperative reactive programming, and it
+works by tracking a history. The basics are as follows:
 
 - A process runs from start to finish, without needing to care about how to
-  update everything.
+  update everything due to changes.
 - The Kagome runtime tracks checkpoint objects (`Runnable` type). (Checkpoint
-  objects are those returned by the **thunk**, which is the function passed to
+  objects are those returned by the *thunk*, which is the function passed to
   `run`)
-- Each checkpoint object can either have a value and a trigger event, or has an
+- Each checkpoint object can either have a value and a trigger event, or have an
   'undo' action, or have both.
     - The value and trigger event usually means some dynamic value (Called
       `Sentinel` since it 'watches' something changing). When `run` the process
@@ -102,42 +175,21 @@ basic premise is as follows:
       unlistening to `Sentinels` in reverse order until the desired position is
       reached.
 
-Effectively, you can write your code only thinking in the forward direction,
-generating output from input, and the chore of updating the output according to
-input changes is turned into a straightforward time travelling mechanism.
-
-But how is this time travelling event handler possible, given that JavaScript
-has no advanced control flow features like continuations?
+But how is this time travel event handling possible, given that JavaScript has
+no advanced control flow features like continuations?
 
 This is where the funny syntax of `run(() => ...)` comes into play. Essentially,
 when it is needed to restart a process from a certain point in the middle, we
 instead restart it from the beginning. We count the number of calls to `run` and
-return *cached* results until we reach the desired number. That is why `run`
-needed to be pure.
+return *cached* results until we reach the desired number. That is why the
+process needed to be pure. Specifically, all resource-creating actions must be
+wrapped in `run(() => K.pureS(...))` to avoid getting a new version every time.
 
-Since a process does exactly what was needed to move from one history to the
-next, there is no need for a virtual DOM and a difference algorithm. `container`
-is a native `HTMLDivElement`:
+## Some common suffixes
 
-```jsx
-    return container;
-});
-```
-
-We can also show off some composition:
-
-```jsx
-K.toplevel((run) => {
-    const app = run(() =>
-        <div class="main">
-            {interact()}
-            {K.mapped([interact(), interact()])}
-        </div>
-    );
-
-    run(() => K.appendChildD(main, app));
-});
-```
+- `S` means `Sentinel`
+- `D` means `Disposable`
+- `R` means `Register`
 
 ## Origin of the name 'Kagome'
 
@@ -148,9 +200,9 @@ K.toplevel((run) => {
 [wp-kagome]: https://en.wikipedia.org/wiki/Kagome_Kagome
 
 The 'kagome' is chosen to mean 'caged bird' in this context. It is a reference
-to the *Capturing the Future by Replaying the Past* technique (See [Functional
-Pearl][capture]), which Kagome implements a part of. (Kagome's implementation is
-not based on the published one as the full feature set of delimited
-continuations is not required.)
+to the word 'capturing' in the *Capturing the Future by Replaying the Past*
+technique (See [Functional Pearl][capture]), which Kagome implements a part of.
+(Kagome's implementation is not based on the published one as the full feature
+set of delimited continuations is not required.)
 
 [capture]: https://arxiv.org/abs/1710.10385
