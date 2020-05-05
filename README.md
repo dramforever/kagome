@@ -25,8 +25,8 @@ Create a process using `K.process`:
 const interact = () => K.process((run) => {
 ```
 
-Processes must be pure, when disregarding calls to `run`. Wrap
-impure things to avoid recomputation: (In general, impurity must be used with caution.)
+Processes must be pure, when disregarding calls to `run`. Wrap impure things to
+avoid recomputation: (In general, impurity must be used with caution.)
 
 ```jsx
     const id = run(() => K.pureS('inp-' + Math.random().toString().slice(2)));
@@ -76,25 +76,48 @@ Listening to events:
     const value = run(() => K.listenS(valueEmitter.event));
 ```
 
-You saw it right: **listening events work like function calls**. What's going on?
+You saw it right: **listening events work like function calls**. What's going
+on?
 
-As promised, Kagome is a framework for imperative reactive programming. The basic premise is as follows:
+As promised, Kagome is a framework for imperative reactive programming. The
+basic premise is as follows:
 
-- A process runs from start to finish, without needing to care about how to update everything.
-- The Kagome runtime tracks checkpoint objects (`Runnable` type). (Checkpoint objects are those returned by the **thunk**, which is the function passed to `run`)
-- Each checkpoint object can either have a value and a trigger event, or has an 'undo' action, or have both.
-    - The value and trigger event usually means some dynamic value (Called `Sentinel` since it 'watches' something changing). When `run` the process listens to the trigger event.
-    - An 'undo' action can correspond to destroying a resource (like unregistering a listener) or literally undoing something (like `appendChild`).
-- When a `Sentinel` triggers, the whole process is *unwound* to the point after the `Sentinel` was sent to `run`, the new value of the `Sentinel` is used, and execution restarts there.
-    - Unwinding in this case means undoing every checkpoint object and unlistening to `Sentinels` in reverse order until the desired position is reached.
+- A process runs from start to finish, without needing to care about how to
+  update everything.
+- The Kagome runtime tracks checkpoint objects (`Runnable` type). (Checkpoint
+  objects are those returned by the **thunk**, which is the function passed to
+  `run`)
+- Each checkpoint object can either have a value and a trigger event, or has an
+  'undo' action, or have both.
+    - The value and trigger event usually means some dynamic value (Called
+      `Sentinel` since it 'watches' something changing). When `run` the process
+      listens to the trigger event.
+    - An 'undo' action can correspond to destroying a resource (like
+      unregistering a listener) or literally undoing something (like
+      `appendChild`).
+- When a `Sentinel` triggers, the whole process is *unwound* to the point after
+  the `Sentinel` was sent to `run`, the new value of the `Sentinel` is used, and
+  execution restarts there.
+    - Unwinding in this case means undoing every checkpoint object and
+      unlistening to `Sentinels` in reverse order until the desired position is
+      reached.
 
-Effectively, you can write your code only thinking in the forward direction, generating output from input, and the chore of updating the output according to input changes is turned into a straightforward time travelling mechanism.
+Effectively, you can write your code only thinking in the forward direction,
+generating output from input, and the chore of updating the output according to
+input changes is turned into a straightforward time travelling mechanism.
 
-But how is this time travelling event handler possible, given that JavaScript has no advanced control flow features like continuations?
+But how is this time travelling event handler possible, given that JavaScript
+has no advanced control flow features like continuations?
 
-This is where the funny syntax of `run(() => ...)` comes into play. Essentially, when it is needed to restart a process from a certain point in the middle, we instead restart it from the beginning. We count the number of calls to `run` and return *cached* results until we reach the desired number. That is why `run` needed to be pure.
+This is where the funny syntax of `run(() => ...)` comes into play. Essentially,
+when it is needed to restart a process from a certain point in the middle, we
+instead restart it from the beginning. We count the number of calls to `run` and
+return *cached* results until we reach the desired number. That is why `run`
+needed to be pure.
 
-Since a process does exactly what was needed to move from one history to the next, there is no need for a virtual DOM and a difference algorithm. `container` is a native `HTMLDivElement`:
+Since a process does exactly what was needed to move from one history to the
+next, there is no need for a virtual DOM and a difference algorithm. `container`
+is a native `HTMLDivElement`:
 
 ```jsx
     return container;
