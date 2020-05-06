@@ -2,8 +2,8 @@ import * as StackTrace from 'stacktrace-js';
 import * as StackTraceGPS from 'stacktrace-gps';
 
 export const debugConfig = {
-    debugProcessRun: true,
-    debugProcessControlFlow: true
+    debugProcessRun: false,
+    debugProcessControlFlow: false
 }
 
 const hasRunSet: WeakSet<any> = new WeakSet();
