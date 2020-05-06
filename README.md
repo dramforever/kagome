@@ -206,3 +206,6 @@ technique (See [Functional Pearl][capture]), which Kagome implements a part of.
 set of delimited continuations is not required.)
 
 [capture]: https://arxiv.org/abs/1710.10385
+
+Disclaimer: No bird has been caged or otherwise made to suffer in the making of
+this framework.
