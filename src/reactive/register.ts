@@ -29,9 +29,9 @@ export class Register<T> implements Sentinel<T>, Disposable {
     setD(value: T): Disposable {
         const oldValue = this.value;
         this.setDirectly(value);
-        return {
+        return ensureRun({
             dispose: () => this.setDirectly(oldValue)
-        };
+        });
     }
 
     dispose() {
