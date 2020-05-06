@@ -16,7 +16,6 @@ export namespace JSX {
     // check the types based on these types
     export type Element = Runnable<DOMElement>;
     export interface IntrinsicElements extends IntrinsicElementsMapping {}
-    export interface ElementChildrenAttribute { children: any; }
 
     // These are just more JSX related stuff
     export type FunctionComponent<P> =
