@@ -1,4 +1,4 @@
-import { Sentinel, Disposable, EventEmitter, KEvent, pureS, ensureRun } from "../basic";
+import { Sentinel, Disposable, EventEmitter, KEvent, pureS, ensureRun, globalScheduler } from "../basic";
 
 let counter = 0;
 
@@ -6,16 +6,24 @@ export class Register<T> implements Sentinel<T>, Disposable {
     triggerEmitter: EventEmitter<T>;
     onTrigger: KEvent<T>;
     num: number;
+    pending: boolean;
 
     constructor(public value: T) {
         this.triggerEmitter = new EventEmitter();
         this.onTrigger = this.triggerEmitter.event;
         this.num = counter ++;
+        this.pending = false;
     }
 
     setDirectly(value: T) {
         this.value = value;
-        this.triggerEmitter.fire(value);
+        if (this.pending) return;
+
+        this.pending = true;
+        globalScheduler.add(() => {
+            this.pending = false;
+            this.triggerEmitter.fire(this.value);
+        });
     }
 
     setD(value: T): Disposable {
