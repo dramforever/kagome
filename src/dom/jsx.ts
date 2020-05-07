@@ -71,7 +71,6 @@ export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
 
     childOffsets: number[];
     propsSave: PropsSave;
-    childrenCache: Child[];
 
     constructor(
         public type: string,
@@ -84,7 +83,6 @@ export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
 
         this.value = document.createElement(type);
 
-        this.childrenCache = Array(children.length);
         this.childOffsets = Array(children.length + 1);
         this.childOffsets[0] = 0;
 
@@ -113,13 +111,8 @@ export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
         for (let i = 0; i != children.length; i++) {
             if (isSentinel(children[i])) {
                 const child = children[i] as Sentinel<Child>;
-                this.childrenCache[i] = child.value;
                 genChild(range, child.value);
                 this.listenersD.push(child.onTrigger((newVal) => {
-                    const isCached = cacheEqual(newVal, this.childrenCache[i]);
-                    this.childrenCache[i] = newVal;
-                    if (isCached)
-                        return;
                     const newRange = document.createRange();
                     newRange.setStart(this.value, this.childOffsets[i]);
                     newRange.setEnd(this.value, this.childOffsets[i + 1]);
@@ -152,19 +145,6 @@ export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
                 (child as any)?.dispose();
         }
     }
-}
-
-function arrayEquals<T>(a: T[], b: T[]): boolean {
-    return a.length == b.length && a.every((val, i) => val == b[i]);
-}
-
-function cacheEqual(newVal: Child, cached: Child) {
-    return (
-        newVal === cached
-        || Array.isArray(newVal)
-        && Array.isArray(cached)
-        && arrayEquals(newVal, cached as Element[])
-    );
 }
 
 function applyProp<El extends Element, K extends keyof PropsSimple<El>>(

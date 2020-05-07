@@ -20,7 +20,8 @@ export class Process<T> implements Sentinel<T>, Disposable {
     onTrigger: KEvent<T>;
 
     constructor(
-        public pf: ProcessFunction<T>
+        public pf: ProcessFunction<T>,
+        public checkNew: (oldVal: T, newVal: T) => boolean
     ) {
         this.triggerEmitter = new EventEmitter();
         this.onTrigger = this.triggerEmitter.event;
@@ -49,8 +50,11 @@ export class Process<T> implements Sentinel<T>, Disposable {
                                 se.handleD?.dispose();
                                 se.cache.dispose?.();
                             }
-                            this.value = this.run();
-                            this.triggerEmitter.fire(this.value);
+                            const newVal = this.run();
+                            const shouldTrigger = this.checkNew(this.value, newVal);
+                            this.value = newVal;
+                            if (shouldTrigger)
+                                this.triggerEmitter.fire(this.value);
                         })
                     );
 
@@ -78,7 +82,11 @@ export class Process<T> implements Sentinel<T>, Disposable {
 }
 
 export function process<T>(pf: ProcessFunction<T>): Process<T> {
-    return ensureRun(new Process(pf));
+    return ensureRun(new Process(pf, (o, n) => o !== n));
+}
+
+export function processAll<T>(pf: ProcessFunction<T>): Process<T> {
+    return ensureRun(new Process(pf, () => true));
 }
 
 export function toplevel<T>(p: ProcessFunction<T> | Process<T>) {
