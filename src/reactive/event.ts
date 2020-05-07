@@ -1,13 +1,15 @@
-import { KEvent, Sentinel, EventEmitter, Disposable, ensureRun } from "../basic";
+import { KEvent, Sentinel, EventEmitter, Disposable, ensureRun, SentinelExt } from "../basic";
 
 export class ListeningSentinel<T>
-    implements Sentinel<T | undefined>, Disposable {
+    extends SentinelExt<T | undefined> implements Disposable {
     value: T | undefined;
     eventEmitter: EventEmitter<T>;
     onTrigger: KEvent<T>;
     eventDisposable: Disposable;
 
     constructor(event: KEvent<T>) {
+        super();
+
         this.value = undefined;
         this.eventEmitter = new EventEmitter();
         this.onTrigger = this.eventEmitter.event;

@@ -1,5 +1,5 @@
-import { ensureRun, Runnable, Sentinel, Disposable, nullEvent, KEvent, isSentinel } from "../basic";
-import { WithSentinel, AddSentinel } from "../data";
+import { ensureRun, Runnable, Sentinel, Disposable, nullEvent, KEvent, isSentinel, AddSentinel, WithSentinel, SentinelExt, registerHasRun } from "../basic";
+import { AddArraySentinel, isArraySentinel, ArraySentinel, ArrayPatch } from "../reactive";
 
 type DOMElement = Element;
 
@@ -25,7 +25,8 @@ export namespace JSX {
 
 type NullChild = boolean | undefined | null;
 type Child = Element | Element[] | string | number | NullChild;
-type ChildSentinel<T> = T extends T ? (T | AddSentinel<T>) : never;
+type ChildSentinel<T> =
+    T extends T ? AddArraySentinel<AddArraySentinel<T>> : never;
 export type ChildOrSentinel = ChildSentinel<Child>;
 
 type PropsSimple<El> =
@@ -64,7 +65,7 @@ export function kagomeElement<P>(
 
 type PropsSave = { [K: string]: any };
 
-export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
+export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable {
     value: Element;
     listenersD: Disposable[];
     onTrigger: KEvent<Element>;
@@ -77,6 +78,7 @@ export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
         public props: Props<HTMLElement>,
         public children: ChildOrSentinel[]
     ) {
+        super();
         this.listenersD = [];
         this.onTrigger = nullEvent();
         this.propsSave = {};
@@ -109,25 +111,98 @@ export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
         range.setStart(this.value, 0);
         range.setEnd(this.value, 0);
         for (let i = 0; i != children.length; i++) {
-            if (isSentinel(children[i])) {
-                const child = children[i] as Sentinel<Child>;
-                genChild(range, child.value);
-                this.listenersD.push(child.onTrigger((newVal) => {
-                    const newRange = document.createRange();
-                    newRange.setStart(this.value, this.childOffsets[i]);
-                    newRange.setEnd(this.value, this.childOffsets[i + 1]);
-                    genChild(newRange, newVal);
-                    const delta = newRange.endOffset - this.childOffsets[i + 1];
-                    for (let j = i + 1; j != children.length; j++)
-                        this.childOffsets[j] += delta;
-                }));
-            }
-            else {
-                genChild(range, children[i] as Child);
+            const child = children[i];
+            if (isArraySentinel(child)) {
+                this.genArraySentinel(range, i, child as ArraySentinel<Child>);
+            } else if (isSentinel(child)) {
+                this.genSentinel(range, i, child as Sentinel<Child>);
+            } else {
+                genChild(range, child as Child);
             }
             this.childOffsets[i + 1] = range.endOffset;
             range.setStart(range.endContainer, range.endOffset);
         }
+    }
+
+    genSentinel(range: Range, i: number, child: Sentinel<Child>) {
+        genChild(range, child.value);
+        registerHasRun(child);
+        this.listenersD.push(child.onTrigger((newVal) => {
+            const newRange = document.createRange();
+            newRange.setStart(this.value, this.childOffsets[i]);
+            newRange.setEnd(this.value, this.childOffsets[i + 1]);
+            genChild(newRange, newVal);
+            const delta = newRange.endOffset - this.childOffsets[i + 1];
+            if (delta !== 0) {
+                for (let j = i + 1; j != this.childOffsets.length; j ++)
+                    this.childOffsets[j] += delta;
+            }
+        }));
+    }
+
+    genArraySentinel(range: Range, i: number, child: ArraySentinel<Child>) {
+        const offset = Array(child.value.length + 1);
+        offset[0] = 0;
+        const childRange = range.cloneRange();
+        for (let j = 0; j != child.value.length; j++) {
+            const piece = child.value[j];
+            genChild(childRange, piece);
+            offset[j + 1] = childRange.endOffset - range.startOffset;
+            childRange.setStart(childRange.endContainer, childRange.endOffset);
+        }
+
+        registerHasRun(child);
+        this.listenersD.push(child.onArrayChange((change) => {
+            const base = this.childOffsets[i];
+
+            const workSplice = ({
+                start, deleteCount, inserted
+            }: {
+                start: number;
+                deleteCount: number;
+                inserted: Child[];
+            }) => {
+                const newRange = document.createRange();
+                newRange.setStart(
+                    this.value,
+                    base + offset[start]
+                );
+                newRange.setEnd(
+                    this.value,
+                    base + offset[start + deleteCount]
+                );
+                newRange.deleteContents();
+
+                for (const piece of inserted)
+                    genChild(newRange, piece);
+
+                const delta = newRange.endOffset - base - offset[start + deleteCount];
+                offset.splice(start, deleteCount);
+
+                if (delta !== 0) {
+                    for (let j = start + 1; j != offset.length; j ++)
+                        offset[j] += delta;
+                }
+            };
+
+            for (const patch of change) {
+                if (patch.type === 'splice') {
+                    workSplice(patch)
+                } else if (patch.type === 'update') {
+                    workSplice({
+                        start: patch.index,
+                        deleteCount: 0,
+                        inserted: [patch.value]
+                    });
+                }
+            }
+
+            const delta = offset[offset.length - 1] - this.childOffsets[i + 1];
+            if (delta !== 0) {
+                for (let j = i + 1; j != this.childOffsets.length; j ++)
+                    this.childOffsets[j] += delta;
+            }
+        }));
     }
 
     dispose() {

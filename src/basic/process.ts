@@ -1,4 +1,4 @@
-import { Sentinel, Disposable, Runnable } from "./types";
+import { Sentinel, Disposable, Runnable, SentinelExt } from "./types";
 import { KEvent, EventEmitter } from './event';
 import { registerHasRun, ensureRun } from "./debug";
 import { globalScheduler } from "./scheduler";
@@ -11,7 +11,7 @@ interface StateElement {
     handleD: Disposable | null;
 }
 
-export class Process<T> implements Sentinel<T>, Disposable {
+export class Process<T> extends SentinelExt<T> implements Disposable {
     state: StateElement[] = [];
 
     value: T;
@@ -23,6 +23,8 @@ export class Process<T> implements Sentinel<T>, Disposable {
         public pf: ProcessFunction<T>,
         public checkNew: (oldVal: T, newVal: T) => boolean
     ) {
+        super();
+
         this.triggerEmitter = new EventEmitter();
         this.onTrigger = this.triggerEmitter.event;
         this.value = this.run();

@@ -1,14 +1,15 @@
-import { Sentinel, Disposable, EventEmitter, KEvent, pureS, ensureRun, globalScheduler } from "../basic";
+import { Disposable, EventEmitter, KEvent, pureS, ensureRun, globalScheduler, PureSentinel, SentinelExt } from "../basic";
 
 let counter = 0;
 
-export class Register<T> implements Sentinel<T>, Disposable {
+export class Register<T> extends SentinelExt<T> implements Disposable {
     triggerEmitter: EventEmitter<T>;
     onTrigger: KEvent<T>;
     num: number;
     pending: boolean;
 
     constructor(public value: T) {
+        super();
         this.triggerEmitter = new EventEmitter();
         this.onTrigger = this.triggerEmitter.event;
         this.num = counter ++;
@@ -39,6 +40,6 @@ export class Register<T> implements Sentinel<T>, Disposable {
     }
 }
 
-export function reg<T>(value: T): Sentinel<Register<T>> {
+export function reg<T>(value: T): PureSentinel<Register<T>> {
     return ensureRun(pureS(new Register(value)));
 }
