@@ -29,13 +29,16 @@ export function __kagomeDemo(main: Node) {
 
             const classR = run(() => K.reg<string | undefined>(undefined));
             const valueR = run(() => K.reg(''));
-            const hiddenR = run(() => K.reg(false));
+            const hidePromptR = run(() => K.reg(false));
+            const hideInputR = run(() => K.reg(false));
+            const extraMessageR = run(() => K.reg(''));
 
             const part = run(() =>
                 <div>
                     <label for={id}>Please type {i}: </label>
-                    <Input id={id} class={classR} valueR={valueR}/>
-                    <p class="prompt" hidden={hiddenR}>{valueR} isn't right</p>
+                    <Input id={id} class={classR} valueR={valueR} hidden={hideInputR}/>
+                    <p class="prompt" hidden={hidePromptR}>{valueR} isn't right</p>
+                    <p class="prompt" hidden={hidePromptR}>{extraMessageR}</p>
                 </div>
             );
 
@@ -48,11 +51,17 @@ export function __kagomeDemo(main: Node) {
 
                 if (value === undefined || value === '') {
                     // Input is empty
-                    run(() => hiddenR.setD(true));
+                    run(() => hidePromptR.setD(true));
                 }
+
+                if (value.length - i.toString().length > 10) {
+                    run(() => hideInputR.setD(true));
+                    run(() => extraMessageR.setD('Forget about it'));
+                }
+
                 break;
             } else {
-                run(() => hiddenR.setD(true));
+                run(() => hidePromptR.setD(true));
                 run(() => classR.setD('ok'));
             }
         }
