@@ -1,4 +1,4 @@
-import { KEvent } from './event';
+import { KEvent, nullEvent } from './event';
 import { ensureRun } from './debug';
 
 export interface Disposable {
@@ -27,6 +27,6 @@ export type Runnable<T> =
 export function pureS<T>(value: T): Sentinel<T> {
     return ensureRun({
         value,
-        onTrigger: () => ({ dispose: () => {} })
+        onTrigger: nullEvent()
     });
 }

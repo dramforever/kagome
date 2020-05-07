@@ -1,5 +1,5 @@
-import { process, ensureRun, pureS, Runnable } from "../basic";
-import { WithSentinel, mapped, AddSentinel } from "../data";
+import { ensureRun, Runnable, Sentinel, Disposable, nullEvent, KEvent, isSentinel } from "../basic";
+import { WithSentinel, AddSentinel } from "../data";
 
 type DOMElement = Element;
 
@@ -54,7 +54,9 @@ export function kagomeElement<P>(
     ...children: ChildOrSentinel[]
 ): Runnable<Element> {
     if (typeof type === 'string') {
-        return kagomeIntrinsic(type, props as Props<HTMLElement>, children);
+        return ensureRun(new KagomeIntrinsic(
+            type, props as Props<HTMLElement>, children
+        ));
     } else {
         return kagomeFunction(type, props as P | null, children);
     }
@@ -64,77 +66,6 @@ function kagomeFunction<P>(
     type: JSX.FunctionComponent<P>, props: P | null, children: ChildOrSentinel[]
 ): Runnable<Element> {
     return type(props ?? {} as P, ... children);
-}
-
-function kagomeIntrinsic(
-    type: string, props: Props<HTMLElement>, children: ChildOrSentinel[]
-): Runnable<Element> {
-    const proc = process((run) => {
-        type CacheElement = {
-            ch: Child,
-            range: Range
-        };
-
-        const cache: CacheElement[] = run(() => pureS([]));
-        const propSave: { [K in keyof typeof props]?: Props<HTMLElement>[K] } =
-            run(() => pureS({}));
-
-        const element = run(() => pureS(document.createElement(type)));
-
-        const res: {
-            props: PropsSimple<Element> | null,
-            children: Child[]
-        } = run(() => mapped({
-            props: props && mapped<PropsSimple<Element>>(props),
-            children: mapped(children)
-        }));
-
-        if (res.props !== null)
-            applyProps(element, res.props, propSave);
-
-        applyChildren(element, cache, res.children);
-
-        return element;
-    });
-
-    // Element will never change
-    proc.onTrigger = () => { return { dispose: () => {} }};
-    return ensureRun(proc);
-}
-
-function applyProps<El extends Element>(
-    element: El,
-    props: PropsSimple<El>,
-    propSave: { [K in keyof typeof props]?: PropsSimple<El>[K] }
-) {
-    for (const [k, v] of Object.entries(props)) {
-        if (! props.hasOwnProperty(k)) continue;
-
-        if (v === undefined) {
-            if (k in propSave) {
-                const saved = (propSave as any)[k];
-                if (k in element) {
-                    (element as any)[k] = saved;
-                } else {
-                    if (saved === null)
-                        element.removeAttribute(k);
-                    else
-                        element.setAttribute(k, saved);
-                }
-                delete (propSave as any)[k];
-            }
-        } else {
-            if (k in element) {
-                if (! (k in propSave))
-                    (propSave as any)[k] = (element as any)[k];
-                (element as any)[k] = v;
-            } else {
-                if (! (k in propSave))
-                    (propSave as any)[k] = element.getAttribute(k);
-                element.setAttribute(k, v as string);
-            }
-        }
-    }
 }
 
 type SimpleRange = {
@@ -154,33 +85,134 @@ function unsimplifyRange(simpleRange: SimpleRange): Range {
     return range;
 }
 
-function applyChildren(
-    element: Element,
-    cache: { ch: Child; range: SimpleRange; }[],
-    children: Child[]
-) {
-    if (children.length === 0) return;
+type PropsSave<El> = { [K in keyof PropsSimple<El>]?: PropsSimple<El>[K] };
 
-    if (cache.length === 0) {
-        for (const ch of children) {
-            const range = document.createRange();
-            range.selectNodeContents(element);
+export class KagomeIntrinsic implements Sentinel<Element>, Disposable {
+    value: Element;
+    listenersD: Disposable[];
+    onTrigger: KEvent<Element>;
+
+    childOffsets: number[];
+    propsSave: PropsSave<Element>;
+    childrenCache: Child[];
+
+    constructor(
+        public type: string,
+        public props: Props<HTMLElement>,
+        public children: ChildOrSentinel[]
+    ) {
+        this.listenersD = [];
+        this.onTrigger = nullEvent();
+        this.propsSave = {};
+
+        this.value = document.createElement(type);
+
+        for (const [k, v] of Object.entries(props ?? {})) {
+            if (isSentinel(v)) {
+                applyProp(this.value, k as any, v.value as any, this.propsSave);
+                this.listenersD.push(v.onTrigger((newVal: any) => {
+                    applyProp(this.value, k as any, newVal, this.propsSave);
+                }));
+            } else {
+                applyProp(this.value, k as any, v as any, this.propsSave);
+            }
+        }
+
+        this.childrenCache = Array(children.length);
+        this.childOffsets = Array(children.length + 1);
+        this.childOffsets[0] = 0;
+
+        const range = document.createRange();
+        range.setStart(this.value, 0);
+        range.setEnd(this.value, 0);
+
+        for (let i = 0; i != children.length; i ++) {
+            if (isSentinel(children[i])) {
+                const child = children[i] as Sentinel<Child>;
+                this.childrenCache[i] = child.value;
+                genChild(range, child.value);
+                this.listenersD.push(child.onTrigger((newVal) => {
+                    const isCached = cacheEqual(newVal, this.childrenCache[i]);
+                    this.childrenCache[i] = newVal;
+                    if (isCached) return;
+
+                    const newRange = document.createRange();
+                    newRange.setStart(this.value, this.childOffsets[i]);
+                    newRange.setEnd(this.value, this.childOffsets[i + 1]);
+                    genChild(newRange, newVal);
+                    const delta = newRange.endOffset - this.childOffsets[i + 1];
+                    for (let j = i + 1; j != children.length; j ++)
+                        this.childOffsets[j] += delta;
+                }))
+            } else {
+                genChild(range, children[i] as Child);
+            }
+
+            this.childOffsets[i + 1] = range.endOffset;
             range.setStart(range.endContainer, range.endOffset);
-            genChild(range, ch);
-            cache.push({ ch, range: simplifyRange(range) });
+        }
+
+    }
+
+    dispose() {
+        this.listenersD.forEach(x => x.dispose());
+
+        if (this.props !== null) {
+            for (const val in Object.values(this.props)) {
+                if (isSentinel(val))
+                    (val as any)?.dispose();
+            }
+        }
+
+        for (const child in this.children) {
+            if (isSentinel(child))
+                (child as any)?.dispose();
         }
     }
-    else {
-        children.forEach((ch, i) => {
-            if (ch === cache[i].ch
-                || Array.isArray(ch)
-                && Array.isArray(cache[i].ch)
-                && arrayEquals(ch, cache[i].ch as Element[])) {
-                return;
+}
+
+function arrayEquals<T>(a: T[], b: T[]): boolean {
+    return a.length == b.length && a.every((val, i) => val == b[i]);
+}
+
+function cacheEqual(newVal: Child, cached: Child) {
+    return (
+        newVal === cached
+        || Array.isArray(newVal)
+        && Array.isArray(cached)
+        && arrayEquals(newVal, cached as Element[])
+    );
+}
+
+function applyProp<El extends Element, K extends keyof PropsSimple<El>>(
+    element: El,
+    prop: K,
+    value: PropsSimple<El>[K],
+    propSave: PropsSave<El>
+) {
+    if (value === undefined) {
+        if (prop in propSave) {
+            const saved = (propSave as any)[prop];
+            if (prop in element) {
+                (element as any)[prop] = saved;
+            } else {
+                if (saved === null)
+                    element.removeAttribute(prop);
+                else
+                    element.setAttribute(prop, saved);
             }
-            cache[i].ch = ch;
-            genChild(unsimplifyRange(cache[i].range), ch);
-        });
+            delete (propSave as any)[prop];
+        }
+    } else {
+        if (prop in element) {
+            if (! (prop in propSave))
+                (propSave as any)[prop] = (element as any)[prop];
+            (element as any)[prop] = value;
+        } else {
+            if (! (prop in propSave))
+                (propSave as any)[prop] = element.getAttribute(prop);
+            element.setAttribute(prop, value as string);
+        }
     }
 }
 
@@ -191,8 +223,7 @@ function genChild(range: Range, ch: Child): void {
         || ch === undefined
         || ch === null
         || ch === '') {
-        const comment = document.createComment(String(ch));
-        range.insertNode(comment);
+        /* Nothing */
     } else if (Array.isArray(ch)) {
         const frag = document.createDocumentFragment();
         ch.forEach(x => frag.append(x));
@@ -203,8 +234,4 @@ function genChild(range: Range, ch: Child): void {
     } else {
         range.insertNode(ch);
     }
-}
-
-function arrayEquals<T>(a: T[], b: T[]): boolean {
-    return a.length == b.length && a.every((val, i) => val == b[i]);
 }

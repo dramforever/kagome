@@ -55,3 +55,7 @@ export class EventEmitter<T> implements Disposable {
         this.listeners.clear();
     }
 }
+
+export function nullEvent<T>(): KEvent<T> {
+    return () => ({ dispose: () => {} });
+}
