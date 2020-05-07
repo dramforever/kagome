@@ -1,5 +1,5 @@
 import { Register } from "./register";
-import { Sentinel, KEvent, globalScheduler, EventEmitter, ensureRun, pureS, isSentinel, Disposable, SentinelExt, PureSentinel } from "../basic";
+import { Sentinel, KEvent, globalScheduler, EventEmitter, ensureRun, pureS, isSentinel, Disposable, SentinelExt, PureSentinel, SentinelD, registerHasRun } from "../basic";
 
 export type ArrayPatch<T> =
     {
@@ -17,7 +17,8 @@ export interface ArraySentinel<T> extends Sentinel<T[]> {
     onArrayChange: KEvent<ArrayChange<T>>;
 }
 
-export type AddArraySentinel<T> = T | (ArraySentinel<T> & Partial<Disposable>);
+export type ArraySentinelD<T> = ArraySentinel<T> & Partial<Disposable>;
+export type AddArraySentinel<T> = T | ArraySentinelD<T>;
 
 export function isArraySentinel(value: any): value is ArraySentinel<any> {
     return isSentinel(value) && ('onArrayChange' in value);
@@ -28,10 +29,17 @@ export abstract class ArraySentinelExt<T>
     implements ArraySentinel<T> {
     abstract onArrayChange: KEvent<ArrayChange<T>>;
 
+    fa<U>(func: (value: T) => U): PureSentinel<FuncArraySentinel<T, U>> {
+        return pureS(ensureRun(new FuncArraySentinel(this, func)));
+    }
+
+    sfa<U>(func: (value: T) => SentinelD<U>): PureSentinel<SentinelFuncArraySentinel<T, U>> {
+        return pureS(ensureRun(new SentinelFuncArraySentinel(this, func)));
+    }
 }
 
 export class ArrayRegister<T> extends ArraySentinelExt<T>
-    implements ArraySentinel<T>, Disposable {
+    implements Disposable {
 
     wrapped: Register<T[]>;
     arrayChangeEmitter: EventEmitter<ArrayChange<T>>;
@@ -41,7 +49,6 @@ export class ArrayRegister<T> extends ArraySentinelExt<T>
 
     get value(): T[] { return this.wrapped.value; }
     get onTrigger(): KEvent<T[]> { return this.wrapped.onTrigger; }
-    get triggerEmitter(): EventEmitter<T[]> { return this.wrapped.triggerEmitter; }
 
     constructor(initial: T[]) {
         super();
@@ -55,7 +62,6 @@ export class ArrayRegister<T> extends ArraySentinelExt<T>
     }
 
     notifyPatch(patch: ArrayPatch<T>) {
-        console.log('notify', patch);
         const shouldNotify = this.changeCache.length === 0;
         this.changeCache.push(patch);
         if (shouldNotify) {
@@ -63,7 +69,6 @@ export class ArrayRegister<T> extends ArraySentinelExt<T>
                 const savedCache = this.changeCache;
                 this.changeCache = [];
                 this.arrayChangeEmitter.fire(savedCache);
-                this.triggerEmitter.fire(this.value);
             })
         }
     }
@@ -158,4 +163,178 @@ export function array<T>(initial: T[] = []): PureSentinel<ArrayRegister<T>> {
     const areg = new ArrayRegister(initial);
     const wrapped = new Proxy(areg, arrayRegisterHandlers);
     return ensureRun(pureS(wrapped));
+}
+
+export class FuncArraySentinel<S, T>
+    extends ArraySentinelExt<T>
+    implements Disposable {
+    value: T[];
+    arrayChangeEmitter: EventEmitter<ArrayChange<T>>;
+    onArrayChange: KEvent<ArrayChange<T>>;
+    triggerEmitter: EventEmitter<T[]>;
+    onTrigger: KEvent<T[]>;
+    listener: Disposable;
+
+    constructor(
+        public wrapped: ArraySentinelD<S>,
+        public func: (value: S) => T
+    ) {
+        super();
+
+        registerHasRun(wrapped);
+        this.value = this.wrapped.value.map(func);
+
+        this.arrayChangeEmitter = new EventEmitter();
+        this.onArrayChange = this.arrayChangeEmitter.event;
+
+        this.triggerEmitter = new EventEmitter();
+        this.onTrigger = this.triggerEmitter.event;
+
+        this.listener = this.wrapped.onArrayChange(
+            this.handleChange.bind(this)
+        );
+    }
+
+    handleChange(change: ArrayChange<S>) {
+        const newChange: ArrayChange<T> = change.map((patch) => {
+            if (patch.type === 'splice') {
+                const newItems = patch.inserted.map(this.func);
+                this.value.splice(patch.start, patch.deleteCount, ...newItems);
+                return {
+                    type: 'splice',
+                    start: patch.start,
+                    deleteCount: patch.deleteCount,
+                    inserted: newItems
+                };
+            } else if (patch.type === 'update') {
+                this.value[patch.index] = this.func(patch.value);
+                return {
+                    type: 'update',
+                    index: patch.index,
+                    value: this.value[patch.index]
+                };
+            } else {
+                const impossible: never = patch;
+                return impossible;
+            }
+        });
+
+        this.arrayChangeEmitter.fire(newChange);
+        this.triggerEmitter.fire(this.value);
+    }
+
+    dispose() {
+        this.wrapped?.dispose?.();
+        this.arrayChangeEmitter.dispose();
+        this.triggerEmitter.dispose();
+        this.listener.dispose();
+    }
+}
+
+export class SentinelFuncArraySentinel<S, T>
+    extends ArraySentinelExt<T>
+    implements Disposable {
+    current: SentinelD<T>[];
+    currentListeners: Disposable[];
+    value: T[];
+    arrayChangeEmitter: EventEmitter<ArrayChange<T>>;
+    onArrayChange: KEvent<ArrayChange<T>>;
+    triggerEmitter: EventEmitter<T[]>;
+    onTrigger: KEvent<T[]>;
+    listener: Disposable;
+
+    constructor(
+        public wrapped: ArraySentinelD<S>,
+        public func: (value: S) => SentinelD<T>
+    ) {
+        super();
+
+        registerHasRun(wrapped);
+        this.current = this.wrapped.value.map(func);
+        this.value = this.current.map(sen => sen.value);
+        this.currentListeners = this.current.map(
+            this.handleSentinel.bind(this)
+        );
+
+        this.arrayChangeEmitter = new EventEmitter();
+        this.onArrayChange = this.arrayChangeEmitter.event;
+
+        this.triggerEmitter = new EventEmitter();
+        this.onTrigger = this.triggerEmitter.event;
+
+        this.listener = this.wrapped.onArrayChange(
+            this.handleChange.bind(this)
+        );
+    }
+
+    handleChange(change: ArrayChange<S>) {
+        const newChange: ArrayChange<T> = change.map((patch) => {
+            if (patch.type === 'splice') {
+                const newSentinels = patch.inserted.map(this.func);
+                this.current.splice(
+                    patch.start, patch.deleteCount,
+                    ...newSentinels
+                ).forEach(sen => sen?.dispose?.());
+
+                const newListeners = newSentinels.map((sen, i) =>
+                    this.handleSentinel(sen, i + patch.start)
+                );
+                this.currentListeners.splice(
+                    patch.start, patch.deleteCount,
+                    ...newListeners
+                ).forEach(l => l.dispose());
+
+                const newValues = newSentinels.map(sen => sen.value)
+                this.value.splice(
+                    patch.start, patch.deleteCount,
+                    ...newValues
+                );
+
+                return {
+                    type: 'splice',
+                    start: patch.start,
+                    deleteCount: patch.deleteCount,
+                    inserted: newValues
+                };
+            } else if (patch.type === 'update') {
+                this.currentListeners[patch.index].dispose();
+                this.current[patch.index].dispose?.();
+
+                const sen = this.func(patch.value);
+                this.current[patch.index] = sen;
+                this.handleSentinel(sen, patch.index);
+                this.value[patch.index] = sen.value;
+
+                return {
+                    type: 'update',
+                    index: patch.index,
+                    value: this.value[patch.index]
+                };
+            } else {
+                const impossible: never = patch;
+                return impossible;
+            }
+        });
+
+        this.arrayChangeEmitter.fire(newChange);
+        this.triggerEmitter.fire(this.value);
+    }
+
+    handleSentinel(sen: Sentinel<T>, i: number) {
+        registerHasRun(sen);
+
+        return sen.onTrigger((newVal) => {
+            this.value[i] = newVal;
+            this.triggerEmitter.fire(this.value);
+        })
+    }
+
+    dispose() {
+        this.wrapped?.dispose?.();
+        this.arrayChangeEmitter.dispose();
+        this.triggerEmitter.dispose();
+        this.listener.dispose();
+        this.current.forEach(x => x.dispose?.());
+        this.currentListeners.forEach(x => x.dispose());
+    }
 }

@@ -173,14 +173,17 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
                 );
                 newRange.deleteContents();
 
-                for (const piece of inserted)
-                    genChild(newRange, piece);
+                const newOffsets = Array(inserted.length);
+                for (let i = 0; i != inserted.length; i ++) {
+                    genChild(newRange, inserted[i]);
+                    newOffsets[i] = newRange.endOffset - base;
+                }
 
                 const delta = newRange.endOffset - base - offset[start + deleteCount];
-                offset.splice(start, deleteCount);
+                offset.splice(start + 1, deleteCount, ...newOffsets);
 
                 if (delta !== 0) {
-                    for (let j = start + 1; j != offset.length; j ++)
+                    for (let j = start + inserted.length + 1; j != offset.length; j ++)
                         offset[j] += delta;
                 }
             };

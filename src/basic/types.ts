@@ -1,5 +1,5 @@
 import { KEvent, nullEvent, EventEmitter } from './event';
-import { ensureRun } from './debug';
+import { ensureRun, registerHasRun } from './debug';
 
 export interface Disposable {
     dispose: () => void;
@@ -10,7 +10,7 @@ export interface Sentinel<T> {
     onTrigger: KEvent<T>;
 }
 
-type SentinelD<T> = Sentinel<T> & Partial<Disposable>;
+export type SentinelD<T> = Sentinel<T> & Partial<Disposable>;
 
 export type AddSentinel<T> = T | (SentinelD<T>);
 
@@ -35,8 +35,12 @@ export abstract class SentinelExt<T> implements SentinelExt<T> {
     abstract value: T;
     abstract onTrigger: KEvent<T>;
 
-    f<U>(func: (value: T) => U): FuncSentinel<T, U> {
-        return ensureRun(new FuncSentinel(this, func));
+    f<U>(func: (value: T) => U): PureSentinel<FuncSentinel<T, U>> {
+        return pureS(ensureRun(new FuncSentinel(this, func)));
+    }
+
+    sf<U>(func: (value: T) => SentinelD<U>): PureSentinel<SentinelFuncSentinel<T, U>> {
+        return pureS(ensureRun(new SentinelFuncSentinel(this, func)));
     }
 }
 
@@ -66,6 +70,7 @@ export class FuncSentinel<S, T> extends SentinelExt<T> implements Disposable {
     ) {
         super();
 
+        registerHasRun(wrapped);
         this.value = func(wrapped.value);
         this.triggerEmitter = new EventEmitter();
         this.onTrigger = this.triggerEmitter.event;
@@ -76,7 +81,9 @@ export class FuncSentinel<S, T> extends SentinelExt<T> implements Disposable {
     }
 
     dispose() {
+        this.wrapped?.dispose?.();
         this.listener.dispose();
+        this.triggerEmitter.dispose();
     }
 }
 
@@ -94,17 +101,21 @@ export class SentinelFuncSentinel<S, T> extends SentinelExt<T>
     ) {
         super();
 
+        registerHasRun(wrapped);
+
         this.current = func(wrapped.value);
         this.value = this.current.value;
 
         this.triggerEmitter = new EventEmitter();
         this.onTrigger = this.triggerEmitter.event;
 
+        registerHasRun(this.current);
         this.listener = this.current.onTrigger(this.handleNew.bind(this));
 
         this.wrapped.onTrigger((newInput) => {
             this.listener.dispose();
             this.current = func(newInput);
+            registerHasRun(this.current);
             this.listener = this.current.onTrigger(this.handleNew.bind(this));
         })
     }
@@ -115,7 +126,9 @@ export class SentinelFuncSentinel<S, T> extends SentinelExt<T>
     }
 
     dispose() {
+        this.wrapped?.dispose?.();
         this.listener.dispose();
         this.current?.dispose?.();
+        this.triggerEmitter.dispose();
     }
 }
