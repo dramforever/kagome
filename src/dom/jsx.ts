@@ -16,6 +16,7 @@ export namespace JSX {
     // check the types based on these types
     export type Element = Runnable<DOMElement>;
     export interface IntrinsicElements extends IntrinsicElementsMapping {}
+    export interface ElementChildrenAttribute { children: {}; }
 
     // These are just more JSX related stuff
     export type FunctionComponent<P> =
@@ -25,19 +26,14 @@ export namespace JSX {
 
 type NullChild = boolean | undefined | null;
 type Child = Element | Element[] | string | number | NullChild;
-type ChildSentinel<T> =
-    T extends T ? AddArraySentinel<AddArraySentinel<T>> : never;
-export type ChildOrSentinel = ChildSentinel<Child>;
+export type ChildOrSentinel = AddArraySentinel<Child> | AddSentinel<Child>;
 
 type PropsSimple<El> =
-    { [k in keyof El]?: El[k] | undefined }
-    | { [k in Exclude<string, keyof El>]?: string | undefined };
+    { [k in Exclude<keyof El, 'children'>]?: El[k] | undefined }
+    | { [k in Exclude<string, keyof El | 'children'>]?: string | undefined };
 
 type Props<El> = WithSentinel<PropsSimple<El>> | null;
-type PropsChildren<El> =
-    { children?: ChildOrSentinel[] }
-    | WithSentinel<PropsSimple<El>>
-    | null;
+type PropsChildren<El> = { children?: ChildOrSentinel | ChildOrSentinel[] } & WithSentinel<PropsSimple<El>>;
 
 export function kagomeElement<K extends keyof IntrinsicElementsMapping>(
     type: K, props: Props<IntrinsicElementsMapping[K]>, ...children: ChildOrSentinel[]
