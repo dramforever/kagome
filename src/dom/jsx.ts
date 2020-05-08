@@ -91,6 +91,7 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
     populateProps(props: Props<HTMLElement>) {
         for (const [k, v] of Object.entries(props ?? {})) {
             if (isSentinel(v)) {
+                registerHasRun(v);
                 applyProp(this.value, k as any, v.value as any, this.propsSave);
                 this.listenersD.push(v.onTrigger((newVal: any) => {
                     applyProp(this.value, k as any, newVal, this.propsSave);
