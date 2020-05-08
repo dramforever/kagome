@@ -116,6 +116,7 @@ export class SentinelFuncSentinel<S, T> extends SentinelExt<T>
             this.listener.dispose();
             this.current = func(newInput);
             registerHasRun(this.current);
+            this.handleNew(this.current.value);
             this.listener = this.current.onTrigger(this.handleNew.bind(this));
         })
     }
