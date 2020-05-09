@@ -1,0 +1,27 @@
+{
+    "name": "kagome",
+    "version": "0.0.1",
+    "author": "dramforever",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/dramforever/kagome"
+    },
+    "main": "dist/index.js",
+    "types": "kagome.d.ts",
+    "devDependencies": {
+        "terser-webpack-plugin": "^2.3.5",
+        "ts-loader": "^6.2.2",
+        "typescript": "^3.8.3",
+        "webpack": "^4.42.1",
+        "webpack-cli": "^3.3.11"
+    },
+    "scripts": {
+        "prepack": "webpack --config webpack.config.js",
+        "watch": "webpack --watch --config webpack.dev.js"
+    },
+    "dependencies": {
+        "stacktrace-gps": "^3.0.4",
+        "stacktrace-js": "^2.0.2"
+    }
+}
