@@ -81,7 +81,6 @@ export class FuncSentinel<S, T> extends SentinelExt<T> implements Disposable {
     }
 
     dispose() {
-        this.wrapped?.dispose?.();
         this.listener.dispose();
         this.triggerEmitter.dispose();
     }
@@ -127,7 +126,6 @@ export class SentinelFuncSentinel<S, T> extends SentinelExt<T>
     }
 
     dispose() {
-        this.wrapped?.dispose?.();
         this.listener.dispose();
         this.current?.dispose?.();
         this.triggerEmitter.dispose();

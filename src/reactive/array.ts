@@ -224,7 +224,6 @@ export class FuncArraySentinel<S, T>
     }
 
     dispose() {
-        this.wrapped?.dispose?.();
         this.arrayChangeEmitter.dispose();
         this.triggerEmitter.dispose();
         this.listener.dispose();
@@ -330,7 +329,6 @@ export class SentinelFuncArraySentinel<S, T>
     }
 
     dispose() {
-        this.wrapped?.dispose?.();
         this.arrayChangeEmitter.dispose();
         this.triggerEmitter.dispose();
         this.listener.dispose();
