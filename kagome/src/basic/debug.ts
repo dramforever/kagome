@@ -1,5 +1,5 @@
-import * as StackTrace from 'stacktrace-js';
-import * as StackTraceGPS from 'stacktrace-gps';
+import StackTrace from 'stacktrace-js';
+import StackTraceGPS from 'stacktrace-gps';
 
 export const debugConfig = {
     debugProcessRun: false,

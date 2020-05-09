@@ -11,10 +11,16 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "downlevelIteration": true,
+    "importHelpers": true,
     "jsx": "react",
+    "incremental": true,
     "declarationDir": "dist",
     "outDir": "dist"
   },
   "include": ["src"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules"],
+
+  "references": [
+    { "path": "../kagome" }
+  ]
 }

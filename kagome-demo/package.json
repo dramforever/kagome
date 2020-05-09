@@ -1,14 +1,16 @@
 {
     "private": true,
     "name": "kagome-demo",
+    "version": "0.0.1",
     "dependencies": {
-        "kagome": "*"
+        "kagome": "*",
+        "tslib": "^1.11.2"
     },
     "devDependencies": {
         "typescript": "^3.8.3"
     },
     "scripts": {
-        "prepack": "tsc",
-        "watch": "tsc --watch"
+        "prepack": "tsc --build",
+        "watch": "tsc --build --watch --preserveWatchOutput"
     }
 }
