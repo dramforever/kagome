@@ -1,0 +1,14 @@
+{
+    "private": true,
+    "name": "kagome-demo",
+    "dependencies": {
+        "kagome": "*"
+    },
+    "devDependencies": {
+        "typescript": "^3.8.3"
+    },
+    "scripts": {
+        "prepack": "tsc",
+        "watch": "tsc --watch"
+    }
+}

@@ -1,4 +1,4 @@
 {
     "private": true,
-    "workspaces": ["kagome"]
+    "workspaces": ["kagome", "kagome-demo"]
 }
