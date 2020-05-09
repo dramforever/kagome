@@ -16,9 +16,9 @@ elements.
 
 ## A glimpse of Kagome
 
-(The following are code fragments from `src/demo.ts`. They are meant to show
-what code using Kagome looks like, so they might not make sense. Check the full
-demo file for details)
+(The following are code fragments from `kagome-demo/src/demo.ts`. They are meant
+to show what code using Kagome looks like, so they might not make sense. Check
+the full demo file for details)
 
 Import Kagome, using `K` as the shorthand prefix:
 
@@ -134,8 +134,8 @@ next, there is no need for a virtual DOM. `container` is a native
 });
 ```
 
-The following shows some composition capabilities, using both JSX and plain JS syntax
-together, and a combinator `K.mapped` for running actions in parallel:
+The following shows some composition capabilities, using both JSX and plain JS
+syntax together, and a combinator `K.mapped` for running actions in parallel:
 
 ```tsx
 K.toplevel((run) => {
