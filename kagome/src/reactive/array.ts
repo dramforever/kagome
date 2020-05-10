@@ -200,6 +200,7 @@ export class FuncArraySentinel<S, T>
     onArrayChange: KEvent<ArrayChange<T>>;
     triggerEmitter: EventEmitter<T[]>;
     onTrigger: KEvent<T[]>;
+    changeCache: ArrayChange<T>;
     listener: Disposable;
 
     constructor(
@@ -208,6 +209,7 @@ export class FuncArraySentinel<S, T>
         public disposables: Partial<Disposable>[] = []
     ) {
         super();
+        this.changeCache = [];
 
         this.current = this.wrapped.value.map(func);
         this.offsets = Array(this.current.length + 1);
@@ -234,6 +236,18 @@ export class FuncArraySentinel<S, T>
         );
     }
 
+    emitChange(change: ArrayChange<T>) {
+        const shouldFire = this.changeCache.length === 0;
+        this.changeCache.push(... change);
+        if (shouldFire)
+            globalScheduler.add(() => {
+                const savedCache = this.changeCache;
+                this.changeCache = [];
+                this.arrayChangeEmitter.fire(savedCache);
+                this.triggerEmitter.fire(this.value);
+            })
+    }
+
     handleChange(change: ArrayChange<S>) {
         const newChange: ArrayChange<T> = change.map((patch) => {
             if (patch.type === 'splice') {
@@ -243,8 +257,8 @@ export class FuncArraySentinel<S, T>
                     ...newSentinels
                 ).forEach(sen => sen?.dispose?.());
 
-                const newListeners = newSentinels.map((sen, i) =>
-                    this.handleSentinel(sen, i + patch.start)
+                const newListeners = newSentinels.map((sen) =>
+                    this.handleSentinel(sen)
                 );
                 this.currentListeners.splice(
                     patch.start, patch.deleteCount,
@@ -269,18 +283,16 @@ export class FuncArraySentinel<S, T>
                     ...newValuesFlat
                 );
 
-                this.offsets.splice(patch.start + 1, patch.deleteCount);
+                this.offsets.splice(patch.start + 1, patch.deleteCount, ...newOffsets);
 
                 const delta = newValuesFlat.length - deleteCount;
 
                 if (delta !== 0) {
-                    for (let j = patch.start + 1; j != this.offsets.length; j ++)
+                    for (let j = patch.start + newOffsets.length + 1;
+                        j != this.offsets.length;
+                        j ++)
                         this.offsets[j] += delta;
                 }
-
-                this.offsets.splice(patch.start + 1, 0, ...newOffsets);
-
-                this.triggerEmitter.fire(this.value);
 
                 return {
                     type: 'splice',
@@ -294,7 +306,7 @@ export class FuncArraySentinel<S, T>
 
                 const sen = this.func(patch.value);
                 this.current[patch.index] = sen;
-                this.handleSentinel(sen, patch.index);
+                this.handleSentinel(sen);
                 this.replaceSegment(patch.index, sen.value);
 
                 return {
@@ -303,18 +315,24 @@ export class FuncArraySentinel<S, T>
                     value: this.value[patch.index]
                 };
             } else {
-                const impossible: never = patch;
-                return impossible;
+                throw new Error('Wrong patch type attribute');
             }
         });
 
-        this.arrayChangeEmitter.fire(newChange);
-        this.triggerEmitter.fire(this.value);
+        this.emitChange(newChange);
     }
 
-    handleSentinel(sen: Sentinel<T[]>, i: number) {
+    handleSentinel(sen: Sentinel<T[]>) {
         return sen.onTrigger((newVal) => {
-            this.replaceSegment(i, newVal);
+            const index = this.current.indexOf(sen);
+            const change: ArrayChange<T> = [{
+                type: 'splice',
+                start: this.offsets[index],
+                deleteCount: this.offsets[index + 1] - this.offsets[index],
+                inserted: newVal
+            }];
+            this.replaceSegment(index, newVal);
+            this.emitChange(change);
         })
     }
 
@@ -329,7 +347,6 @@ export class FuncArraySentinel<S, T>
             for (let j = i + 1; j != this.offsets.length; j++)
                 this.offsets[j] += delta;
         }
-        this.triggerEmitter.fire(this.value);
     }
 
     dispose() {
