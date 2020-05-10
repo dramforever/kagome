@@ -35,8 +35,10 @@ export abstract class ArraySentinelExt<T>
     }
 
     sfa<U>(func: (value: T) => SentinelD<U>): PureSentinel<FuncArraySentinel<T, U>> {
-        const func1 = (value: T) =>
-            new SentinelFuncSentinel(func(value), x => pureS([x]));
+        const func1 = (value: T) => {
+            const sen = func(value);
+            return new SentinelFuncSentinel(sen, x => pureS([x]), [sen]);
+        };
         return pureS(ensureRun(new FuncArraySentinel(this, func1)));
     }
 }
@@ -183,7 +185,8 @@ export class FuncArraySentinel<S, T>
 
     constructor(
         public wrapped: ArraySentinelD<S>,
-        public func: (value: S) => SentinelD<T[]>
+        public func: (value: S) => SentinelD<T[]>,
+        public disposables: Partial<Disposable>[] = []
     ) {
         super();
 
@@ -319,5 +322,6 @@ export class FuncArraySentinel<S, T>
         this.listener.dispose();
         this.current.forEach(x => x.dispose?.());
         this.currentListeners.forEach(x => x.dispose());
+        this.disposables.forEach(x => x.dispose?.());
     }
 }

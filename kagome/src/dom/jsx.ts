@@ -215,7 +215,7 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
             }
         }
 
-        for (const child in this.children) {
+        for (const child of this.children) {
             if (isSentinel(child))
                 (child as any)?.dispose();
         }

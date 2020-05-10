@@ -1,4 +1,4 @@
-import { Sentinel, Disposable, Runnable, SentinelExt } from "./types";
+import { Disposable, Runnable, SentinelExt } from "./types";
 import { KEvent, EventEmitter } from './event';
 import { registerHasRun, ensureRun } from "./debug";
 import { globalScheduler } from "./scheduler";
@@ -72,7 +72,7 @@ export class Process<T> extends SentinelExt<T> implements Disposable {
     }
 
     dispose() {
-        for (const se of this.state) {
+        for (const se of this.state.reverse()) {
             se.handleD?.dispose();
             se.cache.dispose?.();
         }

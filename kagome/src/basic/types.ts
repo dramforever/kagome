@@ -69,7 +69,8 @@ export class SentinelFuncSentinel<S, T> extends SentinelExt<T>
 
     constructor(
         public wrapped: SentinelD<S>,
-        public func: (value: S) => SentinelD<T>
+        public func: (value: S) => SentinelD<T>,
+        public disposables: Partial<Disposable>[] = []
     ) {
         super();
 
@@ -102,5 +103,6 @@ export class SentinelFuncSentinel<S, T> extends SentinelExt<T>
         this.listener.dispose();
         this.current?.dispose?.();
         this.triggerEmitter.dispose();
+        this.disposables.forEach(x => x.dispose?.());
     }
 }
