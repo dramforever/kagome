@@ -35,8 +35,9 @@ export abstract class SentinelExt<T> implements SentinelExt<T> {
     abstract value: T;
     abstract onTrigger: KEvent<T>;
 
-    f<U>(func: (value: T) => U): PureSentinel<FuncSentinel<T, U>> {
-        return pureS(ensureRun(new FuncSentinel(this, func)));
+    f<U>(func: (value: T) => U): PureSentinel<SentinelFuncSentinel<T, U>> {
+        const func1 = (value: T) => pureS(func(value));
+        return pureS(ensureRun(new SentinelFuncSentinel(this, func1)));
     }
 
     sf<U>(func: (value: T) => SentinelD<U>): PureSentinel<SentinelFuncSentinel<T, U>> {
@@ -56,34 +57,6 @@ export class PureSentinel<T> extends SentinelExt<T> {
 
 export function pureS<T>(value: T): PureSentinel<T> {
     return ensureRun(new PureSentinel(value));
-}
-
-export class FuncSentinel<S, T> extends SentinelExt<T> implements Disposable {
-    value: T;
-    triggerEmitter: EventEmitter<T>;
-    onTrigger: KEvent<T>;
-    listener: Disposable;
-
-    constructor(
-        public wrapped: SentinelD<S>,
-        public func: (value: S) => T
-    ) {
-        super();
-
-        registerHasRun(wrapped);
-        this.value = func(wrapped.value);
-        this.triggerEmitter = new EventEmitter();
-        this.onTrigger = this.triggerEmitter.event;
-        this.listener = wrapped.onTrigger((newVal) => {
-            this.value = func(newVal);
-            this.triggerEmitter.fire(func(newVal));
-        })
-    }
-
-    dispose() {
-        this.listener.dispose();
-        this.triggerEmitter.dispose();
-    }
 }
 
 export class SentinelFuncSentinel<S, T> extends SentinelExt<T>

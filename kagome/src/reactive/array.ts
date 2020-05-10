@@ -1,5 +1,5 @@
 import { Register } from "./register";
-import { Sentinel, KEvent, globalScheduler, EventEmitter, ensureRun, pureS, isSentinel, Disposable, SentinelExt, PureSentinel, SentinelD, registerHasRun } from "../basic";
+import { Sentinel, KEvent, globalScheduler, EventEmitter, ensureRun, pureS, isSentinel, Disposable, SentinelExt, PureSentinel, SentinelD, registerHasRun, SentinelFuncSentinel } from "../basic";
 
 export type ArrayPatch<T> =
     {
@@ -30,11 +30,14 @@ export abstract class ArraySentinelExt<T>
     abstract onArrayChange: KEvent<ArrayChange<T>>;
 
     fa<U>(func: (value: T) => U): PureSentinel<FuncArraySentinel<T, U>> {
-        return pureS(ensureRun(new FuncArraySentinel(this, func)));
+        const func1 = (value: T) => pureS([func(value)]);
+        return pureS(ensureRun(new FuncArraySentinel(this, func1)));
     }
 
-    sfa<U>(func: (value: T) => SentinelD<U>): PureSentinel<SentinelFuncArraySentinel<T, U>> {
-        return pureS(ensureRun(new SentinelFuncArraySentinel(this, func)));
+    sfa<U>(func: (value: T) => SentinelD<U>): PureSentinel<FuncArraySentinel<T, U>> {
+        const func1 = (value: T) =>
+            new SentinelFuncSentinel(func(value), x => pureS([x]));
+        return pureS(ensureRun(new FuncArraySentinel(this, func1)));
     }
 }
 
@@ -168,72 +171,8 @@ export function array<T>(initial: T[] = []): PureSentinel<ArrayRegister<T>> {
 export class FuncArraySentinel<S, T>
     extends ArraySentinelExt<T>
     implements Disposable {
-    value: T[];
-    arrayChangeEmitter: EventEmitter<ArrayChange<T>>;
-    onArrayChange: KEvent<ArrayChange<T>>;
-    triggerEmitter: EventEmitter<T[]>;
-    onTrigger: KEvent<T[]>;
-    listener: Disposable;
-
-    constructor(
-        public wrapped: ArraySentinelD<S>,
-        public func: (value: S) => T
-    ) {
-        super();
-
-        registerHasRun(wrapped);
-        this.value = this.wrapped.value.map(func);
-
-        this.arrayChangeEmitter = new EventEmitter();
-        this.onArrayChange = this.arrayChangeEmitter.event;
-
-        this.triggerEmitter = new EventEmitter();
-        this.onTrigger = this.triggerEmitter.event;
-
-        this.listener = this.wrapped.onArrayChange(
-            this.handleChange.bind(this)
-        );
-    }
-
-    handleChange(change: ArrayChange<S>) {
-        const newChange: ArrayChange<T> = change.map((patch) => {
-            if (patch.type === 'splice') {
-                const newItems = patch.inserted.map(this.func);
-                this.value.splice(patch.start, patch.deleteCount, ...newItems);
-                return {
-                    type: 'splice',
-                    start: patch.start,
-                    deleteCount: patch.deleteCount,
-                    inserted: newItems
-                };
-            } else if (patch.type === 'update') {
-                this.value[patch.index] = this.func(patch.value);
-                return {
-                    type: 'update',
-                    index: patch.index,
-                    value: this.value[patch.index]
-                };
-            } else {
-                const impossible: never = patch;
-                return impossible;
-            }
-        });
-
-        this.arrayChangeEmitter.fire(newChange);
-        this.triggerEmitter.fire(this.value);
-    }
-
-    dispose() {
-        this.arrayChangeEmitter.dispose();
-        this.triggerEmitter.dispose();
-        this.listener.dispose();
-    }
-}
-
-export class SentinelFuncArraySentinel<S, T>
-    extends ArraySentinelExt<T>
-    implements Disposable {
-    current: SentinelD<T>[];
+    current: SentinelD<T[]>[];
+    offsets: number[];
     currentListeners: Disposable[];
     value: T[];
     arrayChangeEmitter: EventEmitter<ArrayChange<T>>;
@@ -244,13 +183,21 @@ export class SentinelFuncArraySentinel<S, T>
 
     constructor(
         public wrapped: ArraySentinelD<S>,
-        public func: (value: S) => SentinelD<T>
+        public func: (value: S) => SentinelD<T[]>
     ) {
         super();
 
         registerHasRun(wrapped);
         this.current = this.wrapped.value.map(func);
-        this.value = this.current.map(sen => sen.value);
+        this.offsets = Array(this.current.length + 1);
+        this.offsets[0] = 0;
+        this.value = [];
+
+        for (let i = 0; i != this.current.length; i ++) {
+            this.value.push(... this.current[i].value);
+            this.offsets[i + 1] = this.value.length;
+        }
+
         this.currentListeners = this.current.map(
             this.handleSentinel.bind(this)
         );
@@ -284,16 +231,41 @@ export class SentinelFuncArraySentinel<S, T>
                 ).forEach(l => l.dispose());
 
                 const newValues = newSentinels.map(sen => sen.value)
+                const start = this.offsets[patch.start];
+                const deleteCount = this.offsets[patch.start + patch.deleteCount] - start;
+
+                const newOffsets = Array(newValues.length);
+                const newValuesFlat = [];
+
+                for (let i = 0; i != newValues.length; i ++) {
+                    newValuesFlat.push(... newValues[i]);
+                    newOffsets[i] = newValuesFlat.length + start;
+                }
+
                 this.value.splice(
-                    patch.start, patch.deleteCount,
-                    ...newValues
+                    start,
+                    deleteCount,
+                    ...newValuesFlat
                 );
+
+                this.offsets.splice(patch.start + 1, patch.deleteCount);
+
+                const delta = newValuesFlat.length - deleteCount;
+
+                if (delta !== 0) {
+                    for (let j = patch.start + 1; j != this.offsets.length; j ++)
+                        this.offsets[j] += delta;
+                }
+
+                this.offsets.splice(patch.start + 1, 0, ...newOffsets);
+
+                this.triggerEmitter.fire(this.value);
 
                 return {
                     type: 'splice',
-                    start: patch.start,
-                    deleteCount: patch.deleteCount,
-                    inserted: newValues
+                    start: start,
+                    deleteCount,
+                    inserted: newValuesFlat
                 };
             } else if (patch.type === 'update') {
                 this.currentListeners[patch.index].dispose();
@@ -302,7 +274,7 @@ export class SentinelFuncArraySentinel<S, T>
                 const sen = this.func(patch.value);
                 this.current[patch.index] = sen;
                 this.handleSentinel(sen, patch.index);
-                this.value[patch.index] = sen.value;
+                this.replaceSegment(patch.index, sen.value);
 
                 return {
                     type: 'update',
@@ -319,13 +291,26 @@ export class SentinelFuncArraySentinel<S, T>
         this.triggerEmitter.fire(this.value);
     }
 
-    handleSentinel(sen: Sentinel<T>, i: number) {
+    handleSentinel(sen: Sentinel<T[]>, i: number) {
         registerHasRun(sen);
 
         return sen.onTrigger((newVal) => {
-            this.value[i] = newVal;
-            this.triggerEmitter.fire(this.value);
+            this.replaceSegment(i, newVal);
         })
+    }
+
+    replaceSegment(i: number, newVal: T[]) {
+        this.value.splice(
+            this.offsets[i],
+            this.offsets[i + 1] - this.offsets[i],
+            ...newVal
+        );
+        const delta = newVal.length - (this.offsets[i + 1] - this.offsets[i]);
+        if (delta !== 0) {
+            for (let j = i + 1; j != this.offsets.length; j++)
+                this.offsets[j] += delta;
+        }
+        this.triggerEmitter.fire(this.value);
     }
 
     dispose() {
