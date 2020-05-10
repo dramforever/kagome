@@ -145,6 +145,7 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
             offset[j + 1] = childRange.endOffset - range.startOffset;
             childRange.setStart(childRange.endContainer, childRange.endOffset);
         }
+        range.setEnd(childRange.endContainer, childRange.endOffset);
 
         this.listenersD.push(child.onArrayChange((change) => {
             const base = this.childOffsets[i];
@@ -171,6 +172,7 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
                 for (let i = 0; i != inserted.length; i ++) {
                     genChild(newRange, inserted[i]);
                     newOffsets[i] = newRange.endOffset - base;
+                    newRange.setStart(newRange.endContainer, newRange.endOffset);
                 }
 
                 const delta = newRange.endOffset - base - offset[start + deleteCount];
@@ -188,7 +190,7 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
                 } else if (patch.type === 'update') {
                     workSplice({
                         start: patch.index,
-                        deleteCount: 0,
+                        deleteCount: 1,
                         inserted: [patch.value]
                     });
                 }
