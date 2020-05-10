@@ -1,6 +1,5 @@
 import { Disposable, Runnable, SentinelExt } from "./types";
 import { KEvent, EventEmitter } from './event';
-import { registerHasRun, ensureRun } from "./debug";
 import { globalScheduler } from "./scheduler";
 
 export type ProcessFunction<T> =
@@ -43,7 +42,6 @@ export class Process<T> extends SentinelExt<T> implements Disposable {
 
             if (index >= this.state.length) {
                 const val = sen();
-                registerHasRun(val);
 
                 const handleD =
                     val.onTrigger?.(() =>
@@ -84,14 +82,13 @@ export class Process<T> extends SentinelExt<T> implements Disposable {
 }
 
 export function process<T>(pf: ProcessFunction<T>): Process<T> {
-    return ensureRun(new Process(pf, (o, n) => o !== n));
+    return new Process(pf, (o, n) => o !== n);
 }
 
 export function processAll<T>(pf: ProcessFunction<T>): Process<T> {
-    return ensureRun(new Process(pf, () => true));
+    return new Process(pf, () => true);
 }
 
-export function toplevel<T>(p: ProcessFunction<T> | Process<T>) {
-    const proc = p instanceof Process ? p : process(p);
-    registerHasRun(proc);
+export function toplevel<T>(p: ProcessFunction<T> | Process<T>): Process<T> {
+    return p instanceof Process ? p : process(p);
 }

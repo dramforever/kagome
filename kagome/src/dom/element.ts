@@ -1,4 +1,4 @@
-import { Disposable, ensureRun } from "../basic";
+import { Disposable } from "../basic";
 
 export function generalElementMovementD(
     node: Node, action: () => void
@@ -7,14 +7,14 @@ export function generalElementMovementD(
     const oldNextSibling = node.nextSibling;
     action();
 
-    return ensureRun({
+    return {
         dispose: () => {
             if (oldParent)
                 oldParent.insertBefore(oldParent, oldNextSibling);
             else
                 node.parentNode!.removeChild(node);
         }
-    });
+    };
 }
 
 export function appendChildD(parent: Node, child: Node): Disposable {

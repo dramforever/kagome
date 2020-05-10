@@ -1,5 +1,4 @@
 import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
 import { terser } from "rollup-plugin-terser";
 
 export default {
@@ -16,8 +15,12 @@ export default {
             format: 'umd',
             name: 'Kagome',
             sourcemap: true,
-            plugins: [terser()]
+            plugins: [terser({
+                output: {
+                    comments: false
+                }
+            })]
         }
     ],
-    plugins: [resolve(), commonjs()]
+    plugins: [resolve()]
 };

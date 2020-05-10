@@ -3,8 +3,6 @@
 
 import K = Kagome;
 
-K.debugConfig.debugProcessRun = true;
-
 const Input:
     (props: { valueR: K.Register<string> }
         & K.JSX.ElementProps<HTMLInputElement>)

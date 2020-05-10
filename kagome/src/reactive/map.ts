@@ -1,4 +1,4 @@
-import { Sentinel, Disposable, KEvent, EventEmitter, isSentinel, globalScheduler, registerHasRun, WithSentinel, SentinelExt } from "../basic";
+import { Disposable, KEvent, EventEmitter, isSentinel, globalScheduler, WithSentinel, SentinelExt } from "../basic";
 import { ArraySentinel, ArrayChange } from "./array";
 
 export class Mapped<T> extends SentinelExt<T> implements Disposable {
@@ -18,7 +18,6 @@ export class Mapped<T> extends SentinelExt<T> implements Disposable {
             const val = this.map[key];
             if (isSentinel(val)) {
                 (this.value[key] as any) = val.value;
-                registerHasRun(val);
                 this.listenersD.push(val.onTrigger((newValue) => {
                     this.updateHook(key, newValue as T[typeof key]);
                     globalScheduler.add(() => {

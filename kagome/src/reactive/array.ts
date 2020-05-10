@@ -1,5 +1,5 @@
 import { Register } from "./register";
-import { Sentinel, KEvent, globalScheduler, EventEmitter, ensureRun, pureS, isSentinel, Disposable, SentinelExt, PureSentinel, SentinelD, registerHasRun, SentinelFuncSentinel } from "../basic";
+import { Sentinel, KEvent, globalScheduler, EventEmitter, pureS, isSentinel, Disposable, SentinelExt, PureSentinel, SentinelD, SentinelFuncSentinel } from "../basic";
 
 export type ArrayPatch<T> =
     {
@@ -31,7 +31,7 @@ export abstract class ArraySentinelExt<T>
 
     fa<U>(func: (value: T) => U): PureSentinel<FuncArraySentinel<T, U>> {
         const func1 = (value: T) => pureS([func(value)]);
-        return pureS(ensureRun(new FuncArraySentinel(this, func1)));
+        return pureS(new FuncArraySentinel(this, func1));
     }
 
     sfa<U>(func: (value: T) => SentinelD<U>): PureSentinel<FuncArraySentinel<T, U>> {
@@ -39,7 +39,7 @@ export abstract class ArraySentinelExt<T>
             const sen = func(value);
             return new SentinelFuncSentinel(sen, x => pureS([x]), [sen]);
         };
-        return pureS(ensureRun(new FuncArraySentinel(this, func1)));
+        return pureS(new FuncArraySentinel(this, func1));
     }
 }
 
@@ -167,7 +167,7 @@ const arrayRegisterHandlers: ProxyHandler<ArrayRegister<any>> = {
 export function array<T>(initial: T[] = []): PureSentinel<ArrayRegister<T>> {
     const areg = new ArrayRegister(initial);
     const wrapped = new Proxy(areg, arrayRegisterHandlers);
-    return ensureRun(pureS(wrapped));
+    return pureS(wrapped);
 }
 
 export class FuncArraySentinel<S, T>
@@ -190,7 +190,6 @@ export class FuncArraySentinel<S, T>
     ) {
         super();
 
-        registerHasRun(wrapped);
         this.current = this.wrapped.value.map(func);
         this.offsets = Array(this.current.length + 1);
         this.offsets[0] = 0;
@@ -295,8 +294,6 @@ export class FuncArraySentinel<S, T>
     }
 
     handleSentinel(sen: Sentinel<T[]>, i: number) {
-        registerHasRun(sen);
-
         return sen.onTrigger((newVal) => {
             this.replaceSegment(i, newVal);
         })

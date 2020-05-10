@@ -1,4 +1,4 @@
-import { Disposable, EventEmitter, KEvent, pureS, ensureRun, globalScheduler, PureSentinel, SentinelExt } from "../basic";
+import { Disposable, EventEmitter, KEvent, pureS, globalScheduler, PureSentinel, SentinelExt } from "../basic";
 
 let counter = 0;
 
@@ -30,9 +30,9 @@ export class Register<T> extends SentinelExt<T> implements Disposable {
     setD(value: T): Disposable {
         const oldValue = this.value;
         this.setDirectly(value);
-        return ensureRun({
+        return {
             dispose: () => this.setDirectly(oldValue)
-        });
+        };
     }
 
     dispose() {
@@ -41,5 +41,5 @@ export class Register<T> extends SentinelExt<T> implements Disposable {
 }
 
 export function reg<T>(value: T): PureSentinel<Register<T>> {
-    return ensureRun(pureS(new Register(value)));
+    return pureS(new Register(value));
 }

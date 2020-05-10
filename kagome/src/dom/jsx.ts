@@ -1,4 +1,4 @@
-import { ensureRun, Runnable, Sentinel, Disposable, nullEvent, KEvent, isSentinel, AddSentinel, WithSentinel, SentinelExt, registerHasRun } from "../basic";
+import { Runnable, Sentinel, Disposable, nullEvent, KEvent, isSentinel, AddSentinel, WithSentinel, SentinelExt } from "../basic";
 import { AddArraySentinel, isArraySentinel, ArraySentinel, ArrayPatch } from "../reactive";
 
 type DOMElement = Element;
@@ -51,9 +51,9 @@ export function kagomeElement<P>(
     ...children: ChildOrSentinel[]
 ): Runnable<Element> {
     if (typeof type === 'string') {
-        return ensureRun(new KagomeIntrinsic(
+        return new KagomeIntrinsic(
             type, props as Props<HTMLElement>, children
-        ));
+        );
     } else {
         return type((props ?? {}) as P, ... children);
     }
@@ -91,7 +91,6 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
     populateProps(props: Props<HTMLElement>) {
         for (const [k, v] of Object.entries(props ?? {})) {
             if (isSentinel(v)) {
-                registerHasRun(v);
                 applyProp(this.value, k as any, v.value as any, this.propsSave);
                 this.listenersD.push(v.onTrigger((newVal: any) => {
                     applyProp(this.value, k as any, newVal, this.propsSave);
@@ -123,7 +122,6 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
 
     genSentinel(range: Range, i: number, child: Sentinel<Child>) {
         genChild(range, child.value);
-        registerHasRun(child);
         this.listenersD.push(child.onTrigger((newVal) => {
             const newRange = document.createRange();
             newRange.setStart(this.value, this.childOffsets[i]);
@@ -148,7 +146,6 @@ export class KagomeIntrinsic extends SentinelExt<Element> implements Disposable 
             childRange.setStart(childRange.endContainer, childRange.endOffset);
         }
 
-        registerHasRun(child);
         this.listenersD.push(child.onArrayChange((change) => {
             const base = this.childOffsets[i];
 

@@ -1,4 +1,4 @@
-import { Disposable, ensureRun } from "../basic";
+import { Disposable } from "../basic";
 
 export function setAttributeD(
     target: Element, name: string, value: any
@@ -6,12 +6,12 @@ export function setAttributeD(
     const oldValue = target.getAttribute(name);
     target.setAttribute(name, value);
 
-    return ensureRun({
+    return {
         dispose: () => {
             if (oldValue)
                 target.setAttribute(name, oldValue);
             else
                 target.removeAttribute(name);
         }
-    })
+    };
 }

@@ -1,4 +1,4 @@
-import { KEvent, Sentinel, EventEmitter, Disposable, ensureRun, SentinelExt } from "../basic";
+import { KEvent, EventEmitter, Disposable, SentinelExt } from "../basic";
 
 export class ListeningSentinel<T>
     extends SentinelExt<T | undefined> implements Disposable {
@@ -27,5 +27,5 @@ export class ListeningSentinel<T>
 }
 
 export function listenS<T>(event: KEvent<T>): ListeningSentinel<T> {
-    return ensureRun(new ListeningSentinel(event));
+    return new ListeningSentinel(event);
 }
