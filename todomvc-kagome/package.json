@@ -1,0 +1,11 @@
+{
+  "name": "todomvc-kagome",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@babel/standalone": "^7.9.6",
+    "kagome": "*",
+    "todomvc-app-css": "^2.0.0",
+    "todomvc-common": "^1.0.0"
+  }
+}

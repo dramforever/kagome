@@ -1,4 +1,12 @@
 {
     "private": true,
-    "workspaces": ["kagome", "kagome-demo"]
+    "workspaces": {
+        "packages": ["kagome", "kagome-demo", "todomvc-kagome"],
+        "nohoist": [
+            "todomvc-kagome/kagome",
+            "todomvc-kagome/@babel/standalone",
+            "todomvc-kagome/todomvc-app-css",
+            "todomvc-kagome/todomvc-common"
+        ]
+    }
 }
