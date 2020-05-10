@@ -52,7 +52,7 @@ const Interact:
         const classS = run(() => correctS.f(val => val ? 'ok' : 'wrong'));
         const promptS = run(() => filteredS.sf(val =>
             val !== undefined && val !== '' && val !== i.toString()
-            ? <p class="prompt">{valueR} isn't right</p>
+            ? <p class="prompt">{filteredS} isn't right</p>
             : K.pureS(null)
         ));
         const extraS = run(() => tooMuchS.sf(val =>
@@ -60,8 +60,6 @@ const Interact:
             ? <p class="prompt">Forget about it</p>
             : K.pureS(null)
         ));
-        run(() => tooMuchS.onTrigger(val => console.log(i, val)));
-        run(() => extraS.onTrigger(val => console.log(i, val)));
 
         const part = run(() =>
             <div>

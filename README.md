@@ -43,24 +43,43 @@ avoid recomputation: (In general, impurity must be used with caution.)
     );
 ```
 
-Creating reactive values called *registers*:
+Creating writable reactive values called *registers*:
 
 ```tsx
     const classR = run(() => K.reg<string | undefined>(undefined));
-    const valueR = run(() => K.reg(''));
-    const hiddenR = run(() => K.reg(false));
+```
+
+Creating derived read-only reactive values using combinators. `f` means applying a function, and `s` prefix means the function itself returns something reactive (`s` for `Sentinel`, basically another thing that can `run` and returns a value).
+
+```tsx
+    const filteredS = run(() => valueR.f(x => x.trim()));
+    const correctS = run(() => filteredS.f(x => x === i.toString()));
+    const tooMuchS = run(() => filteredS.f(x =>
+        x.length - i.toString().length > 10))
+
+    const classS = run(() => correctS.f(val => val ? 'ok' : 'wrong'));
+    const promptS = run(() => filteredS.sf(val =>
+        val !== undefined && val !== '' && val !== i.toString()
+        ? <p class="prompt">{filteredS} isn't right</p>
+        : K.pureS(null)
+    ));
+    const extraS = run(() => tooMuchS.sf(val =>
+        val
+        ? <p class="prompt">Forget about it</p>
+        : K.pureS(null)
+    ));
 ```
 
 Creating and composing elements and components using JSX syntax. Note how
-attributes are allowed to be reactive values, and how sharing `valueR` between
-`Input` and `p` hooks the two up, declaratively specifying reactivity:
+attributes are allowed to be reactive values, and how the reactive values are distributed among UI elements.
 
 ```tsx
     const part = run(() =>
         <div>
             <label for={id}>Please type {i}: </label>
-            <Input id={id} class={classR} valueR={valueR}/>
-            <p class="prompt" hidden={hiddenR}>{valueR} isn't right</p>
+            <Input id={id} class={classS} valueR={valueR} hidden={tooMuchS} />
+            {promptS}
+            {extraS}
         </div>
     );
 ```
