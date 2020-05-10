@@ -1,5 +1,5 @@
 import { Register } from "./register";
-import { Sentinel, KEvent, globalScheduler, EventEmitter, pureS, isSentinel, Disposable, SentinelExt, PureSentinel, SentinelD, SentinelFuncSentinel } from "../basic";
+import { Sentinel, KEvent, globalScheduler, EventEmitter, pureS, isSentinel, Disposable, SentinelExt, PureSentinel, SentinelD, SentinelFuncSentinel, nullEvent } from "../basic";
 
 export type ArrayPatch<T> =
     {
@@ -40,6 +40,14 @@ export abstract class ArraySentinelExt<T>
             return new SentinelFuncSentinel(sen, x => pureS([x]), [sen]);
         };
         return pureS(new FuncArraySentinel(this, func1));
+    }
+
+    asfa<U>(func: (value: T) => SentinelD<U[]>): PureSentinel<FuncArraySentinel<T, U>> {
+        return pureS(new FuncArraySentinel(this, func));
+    }
+
+    dfa(func: (value: T) => Partial<Disposable>): PureSentinel<DisposeFuncArraySentinel<T>> {
+        return pureS(new DisposeFuncArraySentinel(this, func));
     }
 }
 
@@ -320,5 +328,39 @@ export class FuncArraySentinel<S, T>
         this.current.forEach(x => x.dispose?.());
         this.currentListeners.forEach(x => x.dispose());
         this.disposables.forEach(x => x.dispose?.());
+    }
+}
+
+export class DisposeFuncArraySentinel<T> implements Disposable {
+    current: Partial<Disposable>[];
+    listenerD: Disposable;
+
+    constructor(
+        public wrapped: ArraySentinel<T>,
+        public func: (value: T) => Partial<Disposable>
+    ) {
+        this.current = this.wrapped.value.map(func);
+        this.listenerD = this.wrapped.onArrayChange(this.handle.bind(this));
+    }
+
+    handle(change: ArrayChange<T>) {
+        for (const patch of change) {
+            if (patch.type === 'splice') {
+                const newItems = patch.inserted.map(this.func);
+                this.current.splice(
+                    patch.start,
+                    patch.deleteCount,
+                    ...newItems
+                ).forEach(x => x.dispose?.());
+            } else if (patch.type === 'update') {
+                this.current[patch.index].dispose?.();
+                this.current[patch.index] = this.func(patch.value);
+            }
+        }
+    }
+
+    dispose() {
+        this.listenerD.dispose();
+        this.current.forEach(x => x.dispose?.());
     }
 }

@@ -42,6 +42,10 @@ export abstract class SentinelExt<T> implements SentinelExt<T> {
     sf<U>(func: (value: T) => SentinelD<U>): PureSentinel<SentinelFuncSentinel<T, U>> {
         return pureS(new SentinelFuncSentinel(this, func));
     }
+
+    df(func: (value: T) => Partial<Disposable>): PureSentinel<DisposeFuncSentinel<T>> {
+        return pureS(new DisposeFuncSentinel(this, func));
+    }
 }
 
 export class PureSentinel<T> extends SentinelExt<T> {
@@ -99,5 +103,28 @@ export class SentinelFuncSentinel<S, T> extends SentinelExt<T>
         this.current?.dispose?.();
         this.triggerEmitter.dispose();
         this.disposables.forEach(x => x.dispose?.());
+    }
+}
+
+export class DisposeFuncSentinel<T> implements Disposable {
+    current: Partial<Disposable>;
+    listenerD: Disposable;
+
+    constructor(
+        public wrapped: Sentinel<T>,
+        public func: (value: T) => Partial<Disposable>
+    ) {
+        this.current = func(this.wrapped.value);
+        this.listenerD = this.wrapped.onTrigger(this.handle.bind(this));
+    }
+
+    handle(newValue: T) {
+        this.current.dispose?.();
+        this.current = this.func(newValue);
+    }
+
+    dispose() {
+        this.listenerD.dispose();
+        this.current.dispose?.();
     }
 }
