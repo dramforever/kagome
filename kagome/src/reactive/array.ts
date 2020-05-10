@@ -108,6 +108,17 @@ export class ArrayRegister<T> extends ArraySentinelExt<T>
         })
     }
 
+    setD(value: T[]): Disposable {
+        const oldValue = this.value;
+        this.setDirectly(value);
+
+        return {
+            dispose: () => {
+                this.setDirectly(oldValue);
+            }
+        }
+    }
+
     getIndex(index: number) {
         return this.value[index];
     }
