@@ -36,6 +36,15 @@
 		}
 	}
 
+	const LOCAL_STORAGE_KEY = 'todos-kagome';
+	const localStorageSync = (reg, serializedA) => K.process((run) => {
+		const initial = localStorage.getItem(LOCAL_STORAGE_KEY);
+		if (initial !== null) run(() => reg.setD(
+			JSON.parse(initial).map(dat => new Todo(dat))));
+		run(() => serializedA.onTrigger((newVal) =>
+			localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newVal))));
+	})
+
 	const todoList = () => K.process((run) => {
 		const todoA = run(() => K.array([]));
 		const serializedA = run(() => todoA.sfa(todo => todo.serializeS()));
@@ -119,28 +128,16 @@
 		return run(() => filteredViewS);
 	});
 
-	const LOCAL_STORAGE_KEY = 'todos-kagome';
-	const localStorageSync = (reg, serializedA) => K.process((run) => {
-		const initial = localStorage.getItem(LOCAL_STORAGE_KEY);
-		if (initial !== null) run(() => reg.setD(
-			JSON.parse(initial).map(dat => new Todo(dat))));
-		run(() => serializedA.onTrigger((newVal) =>
-			localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newVal))));
-	})
-
 	const locationHashRouter = () => K.process((run) => {
-		const reg = run(() => K.reg(window.location.hash));
-		run(() => K.domEvent(window, 'hashchange')(() =>
-			reg.setDirectly(window.location.hash)));
-		return reg;
+		run(() => K.listenS(K.domEvent(window, 'hashchange')));
+		return window.location.hash;
 	})
-
 
 	K.toplevel((run) => {
 		const todoA = run(() => todoList());
 
 		const todoapp = run(() => K.pureS(document.querySelector('.todoapp')));
-		const locationHashS = run(() => locationHashRouter());
+		const locationHashS = run(() => K.pureS(locationHashRouter()));
 
 		const selectedS = run(() => locationHashS.f(hash => {
 			const page = hash.split('/')[1];
@@ -151,18 +148,12 @@
 
 		const todoViewsA = run(() => todoA.sfa(todo => newTodoView(todo, selectedS)));
 
-		const input = run(() =>
-			<input
-				placeholder="What needs to be done?"
-				class="new-todo" autofocus
-				onkeypress={newTodo} />);
-
 		function newTodo(event) {
 			if (event.keyCode !== KEY.ENTER) return;
-			const text = input.value.trim();
+			const text = this.value.trim();
 			if (text === '') return;
 			todoA.push(new Todo({ text }));
-			input.value = '';
+			this.value = '';
 		}
 
 		function clearCompleted() {
@@ -181,7 +172,9 @@
 		const header = run(() =>
 			<header class="header">
 				<h1>todos</h1>
-				{input}
+				<input placeholder="What needs to be done?"
+					class="new-todo" autofocus
+					onkeypress={newTodo} />
 			</header>);
 
 		const completedAS = run(() => todoA.sfa(val => val.completedR));
